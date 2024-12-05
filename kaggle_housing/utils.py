@@ -242,6 +242,9 @@ def check_data_info(X, y, X_train, X_test, y_train, y_test, show = False):
         def check_dataframe_info(df, name):
             if isinstance(df, (pd.DataFrame, pd.Series)):
                 print(f"\n{name} DataFrame/Series:")
+                # Check for NaN values
+                nan_count = df.isnull().sum().sum() if isinstance(df, pd.DataFrame) else df.isnull().sum()
+                print(f"  Total NaN Values: {nan_count}")
                 # Iterate through columns to check unique counts
                 if isinstance(df, pd.DataFrame):  # For DataFrame, check columns
                     for col in df.columns:
@@ -275,6 +278,10 @@ def check_data_info(X, y, X_train, X_test, y_train, y_test, show = False):
 
 def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,criterion, max_epochs, patience, model_name="default"):
     input_dim = X_train.shape[1]
+    # y_train = y_train.view(-1, 1)
+    # Training with hidden_dim=2048, dropout_rate=0.1, max_epochs=2000, patience=20
+    # Training with hidden_dim=512, dropout_rate=0.1, max_epochs=2000, patience=20
+    # Training with hidden_dim=20000, dropout_rate=0.1, max_epochs=2000, patience=20
 
     if isinstance(criterion, (nn.MSELoss, nn.L1Loss)):  # Check if the criterion is a regression loss
         output_dim = 1  # Regression tasks always have a single continuous output
@@ -297,7 +304,6 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,crit
 
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     model.to(device)
-    criterion.to(device)
 
     # Initialize early stopping variables
     best_loss = float("inf")
@@ -311,7 +317,8 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,crit
         optimizer.zero_grad()
 
         # Forward pass for training
-        outputs_train = model(X_train)
+        outputs_train = model(X_train).squeeze()
+
         train_loss = criterion(outputs_train, y_train)
         
         # Backward pass
@@ -323,7 +330,7 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,crit
         # Evaluate on test set
         model.eval()
         with torch.no_grad():
-            outputs_eval = model(X_test)
+            outputs_eval = model(X_test).squeeze()
             eval_loss = criterion(outputs_eval, y_test)
 
         # Early stopping logic
@@ -351,9 +358,9 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,crit
     runtime = time.time() - start_time
     epoch_trained = epoch + 1
 
-    print(model)
-    print(f"Model {model_name} Training completed in {runtime // 60:.0f}m {runtime % 60:.0f}s")
-    print(f"Average time per epoch: {(runtime / epoch_trained) // 60:.0f}m {(runtime / epoch_trained) % 60:.0f}s")
+    # print(model)
+    # print(f"Model {model_name} Training completed in {runtime // 60:.0f}m {runtime % 60:.0f}s")
+    # print(f"Average time per epoch: {(runtime / epoch_trained) // 60:.0f}m {(runtime / epoch_trained) % 60:.0f}s")
 
     # Evaluate the model
     model.eval()
@@ -368,11 +375,65 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,crit
     rmse = np.sqrt(mse)
     r2 = r2_score(y_test, outputs)
 
-    print(f"Training terminated after epoch {epoch_trained}, "
-          f"MSE: {mse:.4f}, "
-          f"MAE: {mae:.4f}, "
-          f"RMSE: {rmse:.4f}, "
-          f"R²: {r2:.4f}")
+    # print(f"Training terminated after epoch {epoch_trained}, "
+    #       f"MSE: {mse:.4f}, "
+    #       f"MAE: {mae:.4f}, "
+    #       f"RMSE: {rmse:.4f}, "
+    #       f"R²: {r2:.4f}")
 
     # Return metrics and model
     return mse, mae, rmse, r2, runtime, model, outputs, epoch_losses
+
+
+
+
+def reg_hyperparameter_tuning(X_train, y_train, X_test, y_test, device, model_name):
+    # Define hyperparameter grid
+    param_grid = {
+        'hidden_dim': [512, 1024, 2048,10000,20000],
+        'dropout_rate': [0.01,.005, .05, 0.1,.2, 0.3, ],
+        'max_epochs': [1000, 2000, 5000],
+        'patience': [10, 20, 50]
+    }
+
+    best_r2 = -np.inf 
+    log_rmse = 0
+    best_params = None
+    best_model = None
+
+    # Loop through hyperparameters
+    for hidden_dim in param_grid['hidden_dim']:
+        for dropout_rate in param_grid['dropout_rate']:
+            for max_epochs in param_grid['max_epochs']:
+                for patience in param_grid['patience']:
+                    # print(f"Training with hidden_dim={hidden_dim}, dropout_rate={dropout_rate}, max_epochs={max_epochs}, patience={patience}")
+
+                    # Train the model
+                    criterion = nn.MSELoss(reduction='mean')
+                    mse, mae, rmse, r2, runtime, model, outputs, epoch_losses = train_nn_early_stop_regression(X_train, y_train, 
+                                                                                                               X_test, y_test, device, criterion, max_epochs, patience, model_name)
+
+                    # Evaluate model
+                    model.eval()
+                    with torch.no_grad():
+                        y_pred = model(X_test)
+                        r2 = r2_score(y_test.cpu(), y_pred.cpu())
+                        rmse = np.sqrt(mean_squared_error(y_test.cpu(), y_pred.cpu()))
+
+                    # print(f"R2: {r2:.4f}, RMSE: {rmse:.4f}")
+
+                    # Check if this is the best model so far
+                    if r2 > best_r2:
+                        best_r2 = r2
+                        log_rmse = rmse
+                        best_params = {
+                            'hidden_dim': hidden_dim,
+                            'dropout_rate': dropout_rate,
+                            'max_epochs': max_epochs,
+                            'patience': patience
+                        }
+                        best_model = model
+
+    print(f"Best R2: {best_r2:.4f}, RMSE {log_rmse:.4f}")
+    print(f"Best Hyperparameters: {best_params}")
+    return best_model, best_params,best_r2,log_rmse

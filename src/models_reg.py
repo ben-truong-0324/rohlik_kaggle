@@ -44,13 +44,13 @@ from torch.utils.data import DataLoader, TensorDataset
 
 
 class MLPRegression(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim=128, dropout_rate=0.01):
+    def __init__(self, input_dim, output_dim, hidden_dim=2048, dropout_rate=0.1):
         super(MLPRegression, self).__init__()
         self.dropout = nn.Dropout(dropout_rate)
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, hidden_dim // 2)
         self.fc3 = nn.Linear(hidden_dim // 2, hidden_dim // 10)
-        self.fc4 = nn.Linear(hidden_dim // 3, output_dim)
+        self.fc4 = nn.Linear(hidden_dim // 10, output_dim)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
@@ -62,20 +62,20 @@ class MLPRegression(nn.Module):
         return self.fc4(x)  # Output a continuous value
     
 class MLPRegression_lessRelu(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim=128, dropout_rate=0.01):
-        super(MLPRegression, self).__init__()
+    def __init__(self, input_dim, output_dim, hidden_dim=852, dropout_rate=0.1):
+        super(MLPRegression_lessRelu, self).__init__()
         self.dropout = nn.Dropout(dropout_rate)
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, hidden_dim // 2)
-        self.fc3 = nn.Linear(hidden_dim // 2, hidden_dim // 10)
-        self.fc4 = nn.Linear(hidden_dim // 3, output_dim)
+        self.fc3 = nn.Linear(hidden_dim // 2, hidden_dim // 4)
+        self.fc4 = nn.Linear(hidden_dim // 4, output_dim)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = self.dropout(x)
-        x = torch.relu(self.fc2(x))
+        x = self.fc2(x)
         x = self.dropout(x)
-        # x = torch.relu(self.fc3(x))
+        x = self.fc3(x)
         x = self.dropout(x)
         return self.fc4(x)  # Output a continuous value
 

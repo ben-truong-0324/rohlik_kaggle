@@ -205,6 +205,8 @@ def get_eval_reg_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpa
 
         ###################################
         for model_name in EVAL_REG_MODELS:
+            
+
             # avg_metric_per_cv = [0 for _ in range(K_FOLD_CV)] if do_cv else [0]
             # Initialize placeholders for cross-validation metrics
             avg_metrics_per_cv = {
@@ -221,10 +223,17 @@ def get_eval_reg_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpa
                 print(f"Starting fold {fold_idx + 1}")
                 X_train, X_val = X[train_idx], X[val_idx]
                 y_train, y_val = y[train_idx], y[val_idx]
-                
-                mse, mae, rmse, r2, runtime, model, outputs, epoch_losses = train_nn_early_stop_regression(X_train, y_train, X_val, y_val, device,
-                                                                                                                   nn.MSELoss, NN_MAX_EPOCH, NN_PATIENCE, model_name)
 
+                best_model, best_params,best_r2,log_rmse = reg_hyperparameter_tuning(X_train, y_train, X_val, y_val, device, model_name)
+                
+                mse, mae, rmse, r2, runtime, model, outputs, epoch_losses = train_nn_early_stop_regression(
+                                                                                        X_train, y_train, X_val, y_val, device,
+                                                                                        nn.MSELoss(reduction='mean'), 
+                                                                                        3000, #NN_MAX_EPOCH,
+                                                                                        20, #NN_PATIENCE, 
+                                                                                        model_name)
+
+                plots.plot_predictions(y_val, outputs, fold_idx, model_name)
                 avg_metrics_per_cv["mse"].append(mse)
                 avg_metrics_per_cv["mae"].append(mae)
                 avg_metrics_per_cv["rmse"].append(rmse)
@@ -253,12 +262,12 @@ def get_eval_reg_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpa
             print(f"  Average R²: {nn_results[model_name]['avg_r2']:.4f}")
             print(f"  Average Runtime: {nn_results[model_name]['avg_runtime']:.2f}s")
 
-        with open(nn_performance_path, "wb") as f:
-            pickle.dump(nn_results, f, )
-        with open(cv_losses_outpath, "wb") as f:
-            pickle.dump(cv_losses, f, )
-        with open(y_pred_outpath, "wb") as f:
-            pickle.dump(y_preds, f,)
+        # with open(nn_performance_path, "wb") as f:
+        #     pickle.dump(nn_results, f, )
+        # with open(cv_losses_outpath, "wb") as f:
+        #     pickle.dump(cv_losses, f, )
+        # with open(y_pred_outpath, "wb") as f:
+        #     pickle.dump(y_preds, f,)
     else:
         with open(nn_performance_path, 'rb') as f:
             nn_results = pickle.load(f)
@@ -471,6 +480,12 @@ def save_results(results,filename ):
 
 def check_etl():
     X, y = etl.get_data()
+    data = pd.concat([X, y], axis=1)  # Concatenate X and y for easier manipulation
+    data_clean = data.dropna()  # Drop rows where any NaN is present in either X or y
+
+    # Split back into X and y after dropping NaN rows
+    X = data_clean.iloc[:, :-1]  # All columns except the last one (X)
+    y = data_clean.iloc[:, -1]  # Only the last column (y)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.1, random_state=GT_ID)
     test_data_etl_input_check(X,y,X_train, X_test, y_train, y_test, show = True)
     etl.graph_raw_data(X, y)
@@ -482,7 +497,7 @@ def check_etl():
 def main(): 
     np.random.seed(GT_ID)
     X,y,X_train, X_test, y_train, y_test  = check_etl()
-    check_data_info(X, y, X_train, X_test, y_train, y_test, show = True)
+    check_data_info(X, y, X_train, X_test, y_train, y_test, show = False)
 
     ######
     result_save_file = f"{Y_PRED_OUTDIR}/results.pkl"
@@ -496,10 +511,10 @@ def main():
     res_vis_png_path = f"{AGGREGATED_OUTDIR}/results.png" 
     plots.plot_dt_results(results, res_vis_png_path)
 
-    nn_performance_path = f'{PERFM_PKL_OUTDIR}/perf_results.pkl'
-    cv_losses_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_losses.pkl'
-    y_pred_outpath = f'{Y_PRED_OUTDIR}/y_pred_compare.pkl' 
-    get_eval_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpath, do_cv = 0)
+    # nn_performance_path = f'{PERFM_PKL_OUTDIR}/perf_results.pkl'
+    # cv_losses_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_losses.pkl'
+    # y_pred_outpath = f'{Y_PRED_OUTDIR}/y_pred_compare.pkl' 
+    # get_eval_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpath, do_cv = 0)
 
     nn_performance_reg_path = f'{PERFM_PKL_OUTDIR}/perf_reg_results.pkl'
     cv_losses_reg_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_reg_losses.pkl'

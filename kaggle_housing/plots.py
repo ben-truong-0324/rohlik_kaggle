@@ -7,6 +7,7 @@ import numpy as np
 import os 
 from sklearn.metrics import silhouette_score
 import pickle
+import torch
 
 from kaggle_housing.config import *
 
@@ -1569,3 +1570,48 @@ def plot_predictions_vs_actuals(y_test, y_pred, model_name, save_path):
         plt.show()
         
         plt.close()
+
+
+
+def plot_predictions(y_val, outputs, fold_idx, model_name):
+    """
+    Plot true values (y_val) vs predicted values (outputs) for the current fold.
+
+    Args:
+        y_val (tensor or array-like): True values.
+        outputs (tensor or array-like): Model's predicted values.
+        fold_idx (int): The index of the current fold.
+    """
+    # Convert tensors to numpy arrays if needed
+    y_val = y_val.cpu().numpy() if isinstance(y_val, torch.Tensor) else y_val
+    outputs = outputs.cpu().numpy() if isinstance(outputs, torch.Tensor) else outputs
+
+    # Get the min and max values for both y_val and outputs to ensure the same scale
+    min_val = np.min([np.min(y_val), np.min(outputs)])
+    max_val = np.max([np.max(y_val), np.max(outputs)])
+
+    # Create a scatter plot to show the relationship between true and predicted values
+    plt.figure(figsize=(8, 6))
+    plt.scatter(y_val, outputs, color='blue', label=f'Fold {fold_idx + 1}')
+    
+    # Ensure min_val and max_val are used properly to form a straight line for perfect prediction
+    x_line = np.array([min_val, max_val])
+    y_line = np.array([min_val, max_val])
+
+    # Plot the red dashed line (perfect prediction)
+    plt.plot(x_line, y_line, color='red', linestyle='--', label='Perfect Prediction')
+
+    # Add labels and title
+    plt.xlabel('True Values (y_val)')
+    plt.ylabel('Predicted Values (outputs)')
+    plt.title(f'{model_name} Fold {fold_idx + 1}: True vs Pred')
+    plt.legend()
+    plt.grid(True)
+    
+    # Set the same scale for both axes
+    plt.xlim(min_val, max_val)
+    plt.ylim(min_val, max_val)
+    
+    
+    # Show the plot
+    plt.show()

@@ -162,10 +162,14 @@ def get_sp500_data(dataset, do_scaling, do_pca, do_panda):
 
 
 def get_data():
+
     if "kaggle_housing" in DATASET_SELECTION:
         # Load the DataFrame from the pickle file
         try:
-            df = pd.read_csv(KAGGLE_DATASET_PATH)
+            if "test" in DATASET_SELECTION:
+                df = pd.read_csv(KAGGLE_TEST_DATASET_PATH)
+            else:
+                df = pd.read_csv(KAGGLE_DATASET_PATH)
             # Print the shape and columns of the DataFrame
             print(f"Shape of the DataFrame: {df.shape}")
             print(f"Columns of the DataFrame: {df.columns.tolist()}")

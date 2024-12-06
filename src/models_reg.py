@@ -47,10 +47,11 @@ class MLPRegression(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_dim=2048, dropout_rate=0.1):
         super(MLPRegression, self).__init__()
         self.dropout = nn.Dropout(dropout_rate)
+        
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, hidden_dim // 2)
-        self.fc3 = nn.Linear(hidden_dim // 2, hidden_dim // 10)
-        self.fc4 = nn.Linear(hidden_dim // 10, output_dim)
+        self.fc3 = nn.Linear(hidden_dim // 2, hidden_dim // 8)
+        self.fc4 = nn.Linear(hidden_dim // 8, output_dim)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))

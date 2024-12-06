@@ -28,7 +28,6 @@ FARSIGHT_MODELS = [
 
 EVAL_REG_MODELS = [
     'MPL',
-    'MPL_lessrelu',
 ]
 AGGREGATED_OUTDIR = set_output_dir(f'{OUTPUT_DIR_A3}/ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/agregated_graphs')
 Y_PRED_OUTDIR = set_output_dir(f'{OUTPUT_DIR_A3}/ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/y_pred_graphs')

@@ -224,7 +224,8 @@ def get_eval_reg_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpa
                 X_train, X_val = X[train_idx], X[val_idx]
                 y_train, y_val = y[train_idx], y[val_idx]
 
-                best_model, best_params,best_r2,log_rmse = reg_hyperparameter_tuning(X_train, y_train, X_val, y_val, device, model_name)
+                # best_model, best_params,best_r2,log_rmse = reg_hyperparameter_tuning(X_train, y_train, X_val, y_val, device, model_name)
+                
                 
                 mse, mae, rmse, r2, runtime, model, outputs, epoch_losses = train_nn_early_stop_regression(
                                                                                         X_train, y_train, X_val, y_val, device,
@@ -233,7 +234,8 @@ def get_eval_reg_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpa
                                                                                         20, #NN_PATIENCE, 
                                                                                         model_name)
 
-                plots.plot_predictions(y_val, outputs, fold_idx, model_name)
+                plots.plot_predictions(y_val, outputs, fold_idx, model)
+                torch.save(model.state_dict(), f"best_model_{model_name}.pth")
                 avg_metrics_per_cv["mse"].append(mse)
                 avg_metrics_per_cv["mae"].append(mae)
                 avg_metrics_per_cv["rmse"].append(rmse)
@@ -500,16 +502,16 @@ def main():
     check_data_info(X, y, X_train, X_test, y_train, y_test, show = False)
 
     ######
-    result_save_file = f"{Y_PRED_OUTDIR}/results.pkl"
-    if not os.path.exists(result_save_file):
-        results = train_and_evaluate_dt(X_train, y_train, X_test, y_test)
-        print("Model Evaluation Results:", results)
-        save_results(results, f"{Y_PRED_OUTDIR}/results.pkl")
-    else:
-        with open(result_save_file, 'rb') as f:
-            results = pickle.load(f)
-    res_vis_png_path = f"{AGGREGATED_OUTDIR}/results.png" 
-    plots.plot_dt_results(results, res_vis_png_path)
+    # result_save_file = f"{Y_PRED_OUTDIR}/results.pkl"
+    # if not os.path.exists(result_save_file):
+    #     results = train_and_evaluate_dt(X_train, y_train, X_test, y_test)
+    #     print("Model Evaluation Results:", results)
+    #     save_results(results, f"{Y_PRED_OUTDIR}/results.pkl")
+    # else:
+    #     with open(result_save_file, 'rb') as f:
+    #         results = pickle.load(f)
+    # res_vis_png_path = f"{AGGREGATED_OUTDIR}/results.png" 
+    # plots.plot_dt_results(results, res_vis_png_path)
 
     # nn_performance_path = f'{PERFM_PKL_OUTDIR}/perf_results.pkl'
     # cv_losses_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_losses.pkl'

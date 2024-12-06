@@ -13,7 +13,7 @@ import os
 KAGGLE_DATASET_PATH = os.path.join(os.getcwd(), 'data', 'train.csv')
 KAGGLE_TEST_DATASET_PATH = os.path.join(os.getcwd(), 'data', 'test.csv')
 
-DATASET_SELECTION = "kaggle_housing"
+DATASET_SELECTION = "kaggle_housing" #kaggle_housing #kaggle_housing_test
 
 EVAL_FUNC_METRIC = 'rmse'  #'f1' # 'accuracy' 
 

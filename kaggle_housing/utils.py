@@ -14,7 +14,11 @@ from copy import deepcopy
 import kaggle_housing.hypotheses
 from src.models import *
 from src.models_reg import *
+from kaggle_housing.config import *
+
 import math
+from sklearn.preprocessing import LabelEncoder
+
 
 from scipy.stats import ttest_1samp
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
@@ -276,13 +280,9 @@ def check_data_info(X, y, X_train, X_test, y_train, y_test, show = False):
 
 
 
-def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,criterion, max_epochs, patience, model_name="default"):
+def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,params_dict ,criterion, model_name="default"):
     input_dim = X_train.shape[1]
-    # y_train = y_train.view(-1, 1)
-    # Training with hidden_dim=2048, dropout_rate=0.1, max_epochs=2000, patience=20
-    # Training with hidden_dim=512, dropout_rate=0.1, max_epochs=2000, patience=20
-    # Training with hidden_dim=20000, dropout_rate=0.1, max_epochs=2000, patience=20
-
+   
     if isinstance(criterion, (nn.MSELoss, nn.L1Loss)):  # Check if the criterion is a regression loss
         output_dim = 1  # Regression tasks always have a single continuous output
     else:
@@ -292,41 +292,35 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,crit
         else:
             # Single-label classification (y_train has a single label per instance)
             output_dim = len(np.unique(y_train.cpu()))
-    
-
+    max_epochs = 5000
+    patience = 50
     if model_name == "MPL":
-        model = MLPRegression(input_dim, output_dim,).to(device)
+        model = MLPRegression(
+            input_dim,
+            output_dim,
+            hidden_layers=params_dict['hidden_layers'],
+            dropout_rate=params_dict['dropout_rate']
+        ).to(device)
     elif model_name == "MPL_lessrelu":
         model = MLPRegression_lessRelu(input_dim, output_dim,).to(device)
-    
     else:
         raise ValueError(f"Unsupported model type: {model_name}")
+    optimizer = optim.Adam(model.parameters(), lr=params_dict['lr'], weight_decay=params_dict['weight_decay'])
 
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-    model.to(device)
-
-    # Initialize early stopping variables
     best_loss = float("inf")
     patience_counter = 0
     epoch_losses = []
 
-    # Training loop
     start_time = time.time()
     for epoch in range(max_epochs):
         model.train()
         optimizer.zero_grad()
-
         # Forward pass for training
         outputs_train = model(X_train).squeeze()
-
         train_loss = criterion(outputs_train, y_train)
-        
         # Backward pass
         train_loss.backward()
         optimizer.step()
-
-        
-
         # Evaluate on test set
         model.eval()
         with torch.no_grad():
@@ -354,22 +348,14 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,crit
 
     # Restore the best model
     model.load_state_dict(best_model_state)
-
     runtime = time.time() - start_time
-    epoch_trained = epoch + 1
 
-    # print(model)
-    # print(f"Model {model_name} Training completed in {runtime // 60:.0f}m {runtime % 60:.0f}s")
-    # print(f"Average time per epoch: {(runtime / epoch_trained) // 60:.0f}m {(runtime / epoch_trained) % 60:.0f}s")
-
-    # Evaluate the model
     model.eval()
     with torch.no_grad():
         outputs = model(X_test)
         outputs = outputs.cpu().numpy()
         y_test = y_test.cpu().numpy()
 
-    # Compute regression metrics
     mse = mean_squared_error(y_test, outputs)
     mae = mean_absolute_error(y_test, outputs)
     rmse = np.sqrt(mse)
@@ -380,8 +366,6 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,crit
     #       f"MAE: {mae:.4f}, "
     #       f"RMSE: {rmse:.4f}, "
     #       f"R²: {r2:.4f}")
-
-    # Return metrics and model
     return mse, mae, rmse, r2, runtime, model, outputs, epoch_losses
 
 
@@ -391,11 +375,13 @@ def reg_hyperparameter_tuning(X_train, y_train, X_test, y_test, device, model_na
     # Define hyperparameter grid
     param_grid = {
         'hidden_dim': [512, 1024, 2048,10000,20000],
-        'dropout_rate': [0.01,.005, .05, 0.1,.2, 0.3, ],
+        'dropout_rate': [0.01,.005, .05, 0.1, ],
         'max_epochs': [1000, 2000, 5000],
-        'patience': [10, 20, 50]
+        # 'patience': [10, 20, 50],
+        'lr': [.01, .005, .0005, .0001],
+        'weight_decay': [0.0, 0.01, 0.001],
     }
-
+    
     best_r2 = -np.inf 
     log_rmse = 0
     best_params = None
@@ -404,23 +390,25 @@ def reg_hyperparameter_tuning(X_train, y_train, X_test, y_test, device, model_na
     # Loop through hyperparameters
     for hidden_dim in param_grid['hidden_dim']:
         for dropout_rate in param_grid['dropout_rate']:
-            for max_epochs in param_grid['max_epochs']:
-                for patience in param_grid['patience']:
+            for weight_decay in param_grid['weight_decay']:
+                for lr in param_grid['lr']:
                     # print(f"Training with hidden_dim={hidden_dim}, dropout_rate={dropout_rate}, max_epochs={max_epochs}, patience={patience}")
-
-                    # Train the model
+                    params_dict = {
+                        'hidden_dim': hidden_dim,
+                        'dropout_rate': dropout_rate,
+                        'weight_decay': weight_decay,
+                        'lr': lr
+                    }
                     criterion = nn.MSELoss(reduction='mean')
                     mse, mae, rmse, r2, runtime, model, outputs, epoch_losses = train_nn_early_stop_regression(X_train, y_train, 
-                                                                                                               X_test, y_test, device, criterion, max_epochs, patience, model_name)
-
-                    # Evaluate model
+                                                                                                               X_test, y_test, device, params_dict, criterion, model_name)
                     model.eval()
                     with torch.no_grad():
                         y_pred = model(X_test)
                         r2 = r2_score(y_test.cpu(), y_pred.cpu())
                         rmse = np.sqrt(mean_squared_error(y_test.cpu(), y_pred.cpu()))
 
-                    # print(f"R2: {r2:.4f}, RMSE: {rmse:.4f}")
+                    print(f"For params of \n{params_dict}\nR2: {r2:.4f}, RMSE: {rmse:.4f}")
 
                     # Check if this is the best model so far
                     if r2 > best_r2:
@@ -429,11 +417,38 @@ def reg_hyperparameter_tuning(X_train, y_train, X_test, y_test, device, model_na
                         best_params = {
                             'hidden_dim': hidden_dim,
                             'dropout_rate': dropout_rate,
-                            'max_epochs': max_epochs,
-                            'patience': patience
+                            'weight_decay': weight_decay,
+                            'lr': lr
                         }
                         best_model = model
 
+    # Evaluate test sample with test.csv model
+    test_data  = pd.read_csv(KAGGLE_TEST_DATASET_PATH)
+    test_ids = test_data["Id"]
+    
+    df = test_data.drop(columns=['Id'])  # Assuming 'Id' is the first column
+    non_numeric_cols = df.select_dtypes(exclude=['number']).columns.tolist()
+    label_encoder = LabelEncoder()
+    for col in non_numeric_cols:
+        df[col] = label_encoder.fit_transform(df[col])
+
+    X_test = torch.tensor(df, dtype=torch.float32).to(device)  # Move to torch tensor
+
+    # Evaluate the model
+    best_model.eval()
+    with torch.no_grad():
+        y_pred = best_model(X_test).cpu().numpy()  # Move predictions back to CPU and convert to NumPy
+
+    # Merge predictions with IDs
+    submission = pd.DataFrame({
+        "Id": test_ids,
+        "SalePrice": y_pred.flatten()  # Flatten to ensure 1D array for SalePrice
+    })
+
+    # Save to CSV
+    submission.to_csv("submission.csv", index=False)
+
+    
     print(f"Best R2: {best_r2:.4f}, RMSE {log_rmse:.4f}")
     print(f"Best Hyperparameters: {best_params}")
     return best_model, best_params,best_r2,log_rmse

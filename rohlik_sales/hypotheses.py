@@ -3,7 +3,7 @@ from scipy.stats import ttest_1samp
 import pickle
 
 import os
-from kaggle_housing.config import *
+from rohlik_sales.config import *
 
 def run_dred_improves_purity_score_hypo_test(purity_scores, thresholds):
     """

@@ -2,8 +2,8 @@ from config import *
 from tests import *
 from src.models import *
 from utils import *
-import kaggle_housing.etl as etl
-import kaggle_housing.plots as plots
+import rohlik_sales.etl as etl
+import rohlik_sales.plots as plots
 import pickle
 import glob
 import re

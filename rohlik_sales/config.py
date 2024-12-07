@@ -3,19 +3,22 @@ import socket
 # Determine the hostname
 hostname = socket.gethostname()
 if hostname == "Khais-MacBook-Pro.local" or hostname == "Khais-MBP.attlocal.net":  
-    from kaggle_housing.config_mac import *  
+    from rohlik_sales.config_mac import *  
 else:
-    from kaggle_housing.config_cuda import * 
+    from rohlik_sales.config_cuda import * 
 
 import os
 
 
-KAGGLE_DATASET_PATH = os.path.join(os.getcwd(), 'data', 'train.csv')
-KAGGLE_TEST_DATASET_PATH = os.path.join(os.getcwd(), 'data', 'test.csv')
+CALENDAR_PATH = os.path.join(os.getcwd(), 'data', 'calendar.csv')
+INVENTORY_PATH = os.path.join(os.getcwd(), 'data', 'inventory.csv')
+TRAIN_PATH = os.path.join(os.getcwd(), 'data', 'sales_train.csv')
+TEST_PATH = os.path.join(os.getcwd(), 'data', 'sales_test.csv')
 
-DATASET_SELECTION = "kaggle_housing" #kaggle_housing #kaggle_housing_test
 
-EVAL_FUNC_METRIC = 'rmse'  #'f1' # 'accuracy' 
+DATASET_SELECTION = "kaggle_rohlik_sales" #kaggle_housing #kaggle_housing_test
+
+EVAL_FUNC_METRIC = 'mae'  #rmse #'f1' # 'accuracy' 
 
 EVAL_MODELS = [
                 # 'default',

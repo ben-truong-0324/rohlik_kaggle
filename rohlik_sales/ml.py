@@ -1,11 +1,11 @@
-from kaggle_housing.config import *
+from rohlik_sales.config import *
 from src.models import *
-from kaggle_housing.utils import *
-from kaggle_housing.tests import *
+from rohlik_sales.utils import *
+from rohlik_sales.tests import *
 
-import kaggle_housing.etl as etl
-import kaggle_housing.plots as plots
-import kaggle_housing.hypotheses as hypotheses
+import rohlik_sales.etl as etl
+import rohlik_sales.plots as plots
+import rohlik_sales.hypotheses as hypotheses
 
 import pickle
 import glob
@@ -523,10 +523,10 @@ def main():
     # y_pred_outpath = f'{Y_PRED_OUTDIR}/y_pred_compare.pkl' 
     # get_eval_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpath, do_cv = 0)
 
-    nn_performance_reg_path = f'{PERFM_PKL_OUTDIR}/perf_reg_results.pkl'
-    cv_losses_reg_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_reg_losses.pkl'
-    y_pred_reg_outpath = f'{Y_PRED_OUTDIR}/y_pred_reg_compare.pkl' 
-    nn_results, cv_losses, y_preds = get_eval_reg_with_nn(X,y,nn_performance_reg_path,cv_losses_reg_outpath, y_pred_reg_outpath, do_cv = 0)
+    # nn_performance_reg_path = f'{PERFM_PKL_OUTDIR}/perf_reg_results.pkl'
+    # cv_losses_reg_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_reg_losses.pkl'
+    # y_pred_reg_outpath = f'{Y_PRED_OUTDIR}/y_pred_reg_compare.pkl' 
+    # nn_results, cv_losses, y_preds = get_eval_reg_with_nn(X,y,nn_performance_reg_path,cv_losses_reg_outpath, y_pred_reg_outpath, do_cv = 0)
  
 
 if __name__ == "__main__":

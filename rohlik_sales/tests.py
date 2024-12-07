@@ -8,9 +8,9 @@ from tabulate import tabulate
 
 from sklearn.datasets import make_blobs
 
-import kaggle_housing.ml
+import rohlik_sales.ml
 
-from kaggle_housing.config import *
+from rohlik_sales.config import *
 
 
 import pandas as pd

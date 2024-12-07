@@ -8,11 +8,11 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
 
 import time
-from kaggle_housing.config import *
-import kaggle_housing.plots as plots
+from rohlik_sales.config import *
+import rohlik_sales.plots as plots
 
 # from config import *
-# import kaggle_housing.data_plots
+# import rohlik_sales.data_plots
 import pickle
 
 
@@ -142,42 +142,63 @@ def get_sp500_data(dataset, do_scaling, do_pca, do_panda):
 
 
 def get_data():
-
-    if "kaggle_housing" in DATASET_SELECTION:
+    print(f"Getting data for {DATASET_SELECTION}")
+    if "kaggle_rohlik_sales" in DATASET_SELECTION:
         # Load the DataFrame from the pickle file
         try:
-            if "test" in DATASET_SELECTION:
-                df = pd.read_csv(KAGGLE_TEST_DATASET_PATH)
-            else:
-                df = pd.read_csv(KAGGLE_DATASET_PATH)
-            # Print the shape and columns of the DataFrame
-            print(f"Shape of the DataFrame: {df.shape}")
-            print(f"Columns of the DataFrame: {df.columns.tolist()}")
-            
-            # Remove the first column (ID column) from X_df
-            df = df.drop(columns=['Id'])  # Assuming 'Id' is the first column
-            
-            # Process non-numerical columns into numerical
-            # Find non-numeric columns
-            non_numeric_cols = df.select_dtypes(exclude=['number']).columns.tolist()
-            
-            # Use Label Encoding for categorical features
-            label_encoder = LabelEncoder()
-            for col in non_numeric_cols:
-                df[col] = label_encoder.fit_transform(df[col])
-                print(f"Encoded column: {col}")
-            
-            # Split into X (features) and Y (target)
-            # Assuming the last column is the target column
-            X_df = df.iloc[:, :-1]  # All columns except the last one (target)
-            Y_df = df.iloc[:, -1]   # Last column as target
-            
+            calendar = pd.read_csv(CALENDAR_PATH)
+            inventory = pd.read_csv(INVENTORY_PATH)
+            sales_train = pd.read_csv(TRAIN_PATH)
+            print("Accessed .csv in data folder")
+
+            # Extract product and category components
+            try:
+                # Debugging: Check for None or missing values in the relevant columns
+                print("Checking for None or missing values in 'name' and 'L4_category_name_en'")
+                print(inventory[['name', 'L4_category_name_en']].isnull().sum())
+                
+                # Debugging: Display a sample of rows with missing or irregular data
+                missing_data = inventory[inventory['name'].isnull() | inventory['L4_category_name_en'].isnull()]
+                if not missing_data.empty:
+                    print("Rows with missing data in 'name' or 'L4_category_name_en':")
+                    print(missing_data)
+                
+                # Splitting the columns
+                print("Splitting 'name' into 'product_name' and 'product_num'")
+                inventory['product_name'] = inventory['name'].str.rsplit('_', 1).str[0]
+                inventory['product_num'] = inventory['name'].str.rsplit('_', 1).str[1]
+
+                
+                print("Splitting 'L4_category_name_en' into 'cat_name' and 'cat_num'")
+                inventory['cat_name'] = inventory['L4_category_name_en'].str.rsplit('_L4_', 1).str[0]
+                inventory['cat_num'] = inventory['L4_category_name_en'].str.rsplit('_L4_', 1).str[1]
+            except Exception as e:
+                print("An error occurred during the splitting process.")
+                print(f"Error: {e}")
+                print("Displaying first few rows of inventory for debugging:")
+                print(inventory.head())
+
+
+            inventory = inventory[['unique_id', 'warehouse', 'product_name', 'product_num', 'cat_name', 'cat_num']]
+            sales_train = sales_train.merge(inventory, on=['unique_id', 'warehouse'], how='left')
+            print("processed and merged inventory data")
+            sales_train = sales_train.merge(calendar[['date', 'holiday', 'shops_closed', 'winter_school_holidays', 'school_holidays']],
+                                            on='date', how='left')
+            print("merged calendar data")
+            sales_train['sales_whole'] = sales_train.apply(
+                lambda row: row['sales'] / row['availability'] if row['availability'] < 1.0 else row['sales'], axis=1
+            )
+            print("transformed sales_whole for y")
+            print(sales_train.columns)
+            Y_df = sales_train['sales_whole']  # Target variable
+            X_df = sales_train.drop(columns=['sales', 'availability', 'sales_whole'])
+
             print(f"X shape: {X_df.shape}")
             print(f"Columns of the X_df: {X_df.columns.tolist()}")
             print(f"Y shape: {Y_df.shape}")
             # return X, Y
         except FileNotFoundError:
-            print(f"Error: The file '{KAGGLE_DATASET_PATH}' was not found.")
+            print(f"Error: The file '{TRAIN_PATH}' was not found.")
             return None
         except Exception as e:
             print(f"Error loading data: {e}")

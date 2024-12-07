@@ -11,10 +11,10 @@ from tabulate import tabulate
 import pickle
 import random
 from copy import deepcopy
-import kaggle_housing.hypotheses
+import rohlik_sales.hypotheses
 from src.models import *
 from src.models_reg import *
-from kaggle_housing.config import *
+from rohlik_sales.config import *
 
 import math
 from sklearn.preprocessing import LabelEncoder

@@ -12,7 +12,9 @@ import glob
 import re
 import time
 import os
-from datetime import datetime
+# from datetime import datetime
+import datetime
+
 import unittest
 import numpy as np
 import pandas as pd
@@ -445,9 +447,12 @@ def train_and_evaluate_dt(X_train, y_train, X_test, y_test):
 
         print(f"For model {model_name}:")
         evaluate_metrics_in_context(y_test, y_pred, model_name)
-        plots.plot_predictions_vs_actuals(y_test, y_pred, 
-                                          model_name, f"{AGGREGATED_OUTDIR}/pred_actual_diff_{model_name}.png" )
-        
+        if len(y_test) <= 1000: # Only plot if y_test has 1000 or fewer values
+            plots.plot_predictions_vs_actuals( y_test, y_pred, model_name,
+                                 f"{AGGREGATED_OUTDIR}/pred_actual_diff_{model_name}.png")
+        else:
+            print(f"Skipping plot for {model_name} as y_test has more than 1000 values.")
+    
         # Calculate losses
         mse = mean_squared_error(y_test, y_pred)
         mae = mean_absolute_error(y_test, y_pred)
@@ -500,18 +505,43 @@ def main():
     else:
         with open(result_save_file, 'rb') as f:
             results = pickle.load(f)
-    res_vis_png_path = f"{AGGREGATED_OUTDIR}/results.png" 
-    plots.plot_dt_results(results, res_vis_png_path)
+
+    X_test, solution_id = etl.get_test_data()
+    print(X_train.info())
+    print(X_test.info())
+
+
+    model_files = [f for f in os.listdir(MODELS_OUTDIR) if f.endswith('.joblib')]
+
+    # Loop through the models, load each one, and use it for predictions
+    for model_file in model_files:
+        # Full path to the model file
+        model_path = os.path.join(MODELS_OUTDIR, model_file)
+        loaded_model = joblib.load(model_path)
+        predictions = loaded_model.predict(X_new)  # Replace X_new with your actual test data
+        results_df = pd.DataFrame({
+            'id': solution_id,
+            'sales_hat': predictions
+        })
+        result_file =  os.path.join(SOLUTIONS_OUTDIR, f"solutions_{model_file.replace('.joblib', '')}.csv") 
+        results_df.to_csv(result_file, index=False)
+        print(f"Predictions for {model_file} saved in {result_file}")
+
+
+
+
+    # res_vis_png_path = f"{AGGREGATED_OUTDIR}/results.png" 
+    # plots.plot_dt_results(results, res_vis_png_path)
 
     # nn_performance_path = f'{PERFM_PKL_OUTDIR}/perf_results.pkl'
     # cv_losses_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_losses.pkl'
     # y_pred_outpath = f'{Y_PRED_OUTDIR}/y_pred_compare.pkl' 
     # get_eval_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpath, do_cv = 0)
 
-    nn_performance_reg_path = f'{PERFM_PKL_OUTDIR}/perf_reg_results.pkl'
-    cv_losses_reg_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_reg_losses.pkl'
-    y_pred_reg_outpath = f'{Y_PRED_OUTDIR}/y_pred_reg_compare.pkl' 
-    nn_results, cv_losses, y_preds = get_eval_reg_with_nn(X,y,nn_performance_reg_path,cv_losses_reg_outpath, y_pred_reg_outpath, do_cv = 0)
+    # nn_performance_reg_path = f'{PERFM_PKL_OUTDIR}/perf_reg_results.pkl'
+    # cv_losses_reg_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_reg_losses.pkl'
+    # y_pred_reg_outpath = f'{Y_PRED_OUTDIR}/y_pred_reg_compare.pkl' 
+    # nn_results, cv_losses, y_preds = get_eval_reg_with_nn(X,y,nn_performance_reg_path,cv_losses_reg_outpath, y_pred_reg_outpath, do_cv = 0)
  
 
 if __name__ == "__main__":

@@ -178,12 +178,37 @@ def get_data():
                 sales_train = sales_train.merge(calendar[['date', 'holiday', 'shops_closed', 'winter_school_holidays', 'school_holidays']],
                                                 on='date', how='left')
                 print("merged calendar data")
+
+                sales_train['date'] = pd.to_datetime(sales_train['date'])
+                sales_train['day_of_week'] = sales_train['date'].dt.dayofweek
+                sales_train['month'] = sales_train['date'].dt.month
+                sales_train['year'] = sales_train['date'].dt.year
+                
+                label_encoders = {}
+                for col in ['warehouse', 'product_name', 'cat_name']:
+                    le = LabelEncoder()
+                    X_df[col] = le.fit_transform(X_df[col])
+                    label_encoders[col] = le  # Store the encoder for this column
+                with open( f"{LABEL_ENCODERS_PKL_OUTDIR}/lencoders.pkl", "wb") as f:
+                    pickle.dump(label_encoders, f)
+                print("Label encoders saved!")
+                sales_train['product_num'] = pd.to_numeric(sales_train['product_num'], errors='coerce')
+                sales_train['cat_num'] = pd.to_numeric(sales_train['product_num'], errors='coerce')
                 sales_train['sales_whole'] = sales_train.apply(
                     lambda row: row['sales'] / row['availability'] if row['availability'] < 1.0 else row['sales'], axis=1
                 )
-                print("transformed sales_whole for y")
+                sales_train = sales_train.dropna(subset=['sales'])
+                nan_counts = sales_train[['sales', 'sales_whole', 'availability']].isnull().sum()
+                availability_zero_count = (sales_train['availability'] == 0).sum()
+                print("NaN counts:")
+                print(nan_counts)
+                print(f"\nNumber of rows where availability == 0: {availability_zero_count}")
+                nan_summary = sales_train.isnull().sum()
+                print("Missing values in each column:")
+                print(nan_summary[nan_summary > 0])
+                print("updated processed sales_train")
                 sales_train.to_pickle(PROCESSED_TRAIN_PATH)
-                print(f"DataFrame saved as pickle file: {PROCESSED_TRAIN_PATH}")
+                print(f"DataFrame updated and saved as pickle file: {PROCESSED_TRAIN_PATH}")
                 print(sales_train.head())
                 print(sales_train.info())
 
@@ -199,46 +224,6 @@ def get_data():
         print("retreived sales_train")
         ############ nan qa
         sales_train = sales_train.dropna(subset=['sales'])
-        nan_counts = sales_train[['sales', 'sales_whole', 'availability']].isnull().sum()
-        availability_zero_count = (sales_train['availability'] == 0).sum()
-        print("NaN counts:")
-        print(nan_counts)
-        print(f"\nNumber of rows where availability == 0: {availability_zero_count}")
-        nan_summary = sales_train.isnull().sum()
-        print("Missing values in each column:")
-        print(nan_summary[nan_summary > 0])
-        #################
-        ############### uncomment when reprocessing
-        # sales_train['date'] = pd.to_datetime(sales_train['date'])
-        # sales_train['day_of_week'] = sales_train['date'].dt.dayofweek
-        # sales_train['month'] = sales_train['date'].dt.month
-        # sales_train['year'] = sales_train['date'].dt.year
-        # # sales_train = pd.get_dummies(sales_train, columns=['warehouse', 'product_name', 'cat_name'], drop_first=True)
-        # for col in ['warehouse', 'product_name', 'cat_name']:
-        #     le = LabelEncoder()
-        #     sales_train[col] = le.fit_transform(sales_train[col])
-            
-        # label_encoders = {}
-        # for col in ['warehouse', 'product_name', 'cat_name']:
-        #     le = LabelEncoder()
-        #     X_df[col] = le.fit_transform(X_df[col])
-        #     label_encoders[col] = le  # Store the encoder for this column
-        # with open("label_encoders.pkl", "wb") as f:
-        #     pickle.dump(label_encoders, f)
-        # print("Label encoders saved!")
-        # # #when used for test set# Load the saved label encoders
-        # # with open("label_encoders.pkl", "rb") as f:
-        # #     label_encoders = pickle.load(f)
-        # # for col, le in label_encoders.items():
-        # #     test_df[col] = le.transform(test_df[col])
-
-        # sales_train['product_num'] = pd.to_numeric(sales_train['product_num'], errors='coerce')
-        # sales_train['cat_num'] = pd.to_numeric(sales_train['product_num'], errors='coerce')
-
-        # print("updated processed sales_train")
-        # sales_train.to_pickle(PROCESSED_TRAIN_PATH)
-        # print(f"DataFrame updated and saved as pickle file: {PROCESSED_TRAIN_PATH}")
-        # sales_train[['total_orders', 'sell_price_main']].boxplot()
         ###############
         Y_df = sales_train['sales_whole']  # Target variable
         X_df = sales_train.drop(columns=['sales', 'availability', 'sales_whole','date','unique_id'])
@@ -343,6 +328,102 @@ def inspect_pickle_content(pkl_path):
                 print(str(data)[:200])  # First 200 chars
             except:
                 print("[Cannot display data sample]")
+
+
+
+def get_test_data():
+    print(f"Getting test data for {DATASET_SELECTION}")
+    if "kaggle_rohlik_sales" in DATASET_SELECTION:
+        # Load the DataFrame from the pickle file
+        if not os.path.exists(PROCESSED_TEST_PATH):
+            try:
+                ######### derive solution_id column
+                solution_id_outpath = os.path.join(os.getcwd(), 'data', 'solution_id.csv')
+                if not os.path.exists(solution_id_outpath):
+                    solution_id = test_df['unique_id'].astype(str) + "_" + test_df['date']
+                    with open(solution_id_outpath, 'wb') as f:
+                        pickle.dump(solution_id, f)
+                    print(f"solution_id has been saved as pickle in {solution_id_outpath}")
+                else:
+                    with open(solution_id_outpath, "rb") as f:
+                        solution_id = pickle.load(f)
+
+                #########
+
+                calendar = pd.read_csv(CALENDAR_PATH)
+                inventory = pd.read_csv(INVENTORY_PATH)
+                sales_test = pd.read_csv(TEST_PATH)
+                print("Accessed .csv in data folder")
+                try:
+                    inventory['product_name'] = inventory['name'].str.split('_').str[0]
+                    inventory['product_num'] = inventory['name'].str.split('_').str[1]
+
+                    print("Splitting 'L4_category_name_en' into 'cat_name' and 'cat_num'")
+                    inventory['cat_name'] = inventory['L4_category_name_en'].str.split('_L4_').str[0]
+                    inventory['cat_num'] = inventory['L4_category_name_en'].str.split('_L4_').str[1]
+                except Exception as e:
+                    print("Checking for None or missing values in 'name' and 'L4_category_name_en'")
+                    print(inventory[['name', 'L4_category_name_en']].isnull().sum())
+                    # Debugging: Display a sample of rows with missing or irregular data
+                    missing_data = inventory[inventory['name'].isnull() | inventory['L4_category_name_en'].isnull()]
+                    if not missing_data.empty:
+                        print("Rows with missing data in 'name' or 'L4_category_name_en':")
+                        print(missing_data)
+                    print("An error occurred during the splitting process.")
+                    print(f"Error: {e}")
+                    print("Displaying first few rows of inventory for debugging:")
+                    print(inventory.head())
+
+
+                inventory = inventory[['unique_id', 'warehouse', 'product_name', 'product_num', 'cat_name', 'cat_num']]
+                sales_test = sales_test.merge(inventory, on=['unique_id', 'warehouse'], how='left')
+                print("processed and merged inventory data")
+                sales_test = sales_test.merge(calendar[['date', 'holiday', 'shops_closed', 'winter_school_holidays', 'school_holidays']],
+                                                on='date', how='left')
+                print("merged calendar data")
+                ############ nan qa
+                
+                nan_summary = sales_test.isnull().sum()
+                print("Missing values in each column:")
+                print(nan_summary[nan_summary > 0])
+                sales_test['date'] = pd.to_datetime(sales_test['date'])
+                sales_test['day_of_week'] = sales_test['date'].dt.dayofweek
+                sales_test['month'] = sales_test['date'].dt.month
+                sales_test['year'] = sales_test['date'].dt.year
+                
+                #when used for test set# Load the saved label encoders
+                with open("label_encoders.pkl", "rb") as f:
+                    label_encoders = pickle.load(f)
+                for col, le in label_encoders.items():
+                    sales_test[col] = le.transform(sales_test[col])
+
+                sales_test['product_num'] = pd.to_numeric(sales_test['product_num'], errors='coerce')
+                sales_test['cat_num'] = pd.to_numeric(sales_test['product_num'], errors='coerce')
+
+                print("updated processed sales_test")
+                sales_test.to_pickle(PROCESSED_TEST_PATH)
+                print(f"DataFrame updated and saved as pickle file: {PROCESSED_TEST_PATH}")
+                
+            except FileNotFoundError:
+                print(f"Error: The file '{TEST_PATH}' was not found.")
+                return None
+            except Exception as e:
+                print(f"Error loading data: {e}")
+                return None
+        else:
+            #load pickl
+            sales_test = pd.read_pickle(PROCESSED_TEST_PATH)
+        print("retreived sales_test")
+        ###############
+        X_df = sales_test.drop(columns=['date','unique_id'])
+        print(X_df.info())
+    else: 
+        print("#"*18)
+        raise ValueError("Invalid dataset specified. Check config.py")
+    if not isinstance(X_df, pd.DataFrame):
+        X_df = pd.DataFrame(X_df)  # Convert to DataFrame
+    return X_df, solution_id
+
 
 if __name__ == "__main__":
     ###################

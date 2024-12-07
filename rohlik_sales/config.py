@@ -16,6 +16,7 @@ TRAIN_PATH = os.path.join(os.getcwd(), 'data', 'sales_train.csv')
 PROCESSED_TRAIN_PATH = os.path.join(os.getcwd(), 'data', 'sales_train_processed.csv')
 
 TEST_PATH = os.path.join(os.getcwd(), 'data', 'sales_test.csv')
+PROCESSED_TEST_PATH = os.path.join(os.getcwd(), 'data', 'sales_test_processed.csv')
 
 
 
@@ -60,6 +61,8 @@ Y_PRED_OUTDIR = set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUNC_ME
 CV_LOSSES_PKL_OUTDIR = set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/pkl_cv')
 PERFM_PKL_OUTDIR = set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/perf_pkl')
 MODELS_OUTDIR = set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/saved_models')
+LABEL_ENCODERS_PKL_OUTDIR = set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/label_encoders')
+SOLUTIONS_OUTDIR = set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/solutions')
 
 
 TXT_OUTDIR = set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/txt_stats')

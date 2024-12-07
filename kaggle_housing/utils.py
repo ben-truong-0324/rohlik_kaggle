@@ -278,8 +278,6 @@ def check_data_info(X, y, X_train, X_test, y_train, y_test, show = False):
 
 
 
-
-
 def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,params_dict ,criterion, model_name="default"):
     input_dim = X_train.shape[1]
    
@@ -298,7 +296,7 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
         model = MLPRegression(
             input_dim,
             output_dim,
-            hidden_layers=params_dict['hidden_layers'],
+            hidden_dim=params_dict['hidden_dim'],
             dropout_rate=params_dict['dropout_rate']
         ).to(device)
     elif model_name == "MPL_lessrelu":
@@ -374,14 +372,24 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
 def reg_hyperparameter_tuning(X_train, y_train, X_test, y_test, device, model_name):
     # Define hyperparameter grid
     param_grid = {
-        'hidden_dim': [512, 1024, 2048,10000,20000],
-        'dropout_rate': [0.01,.005, .05, 0.1, ],
-        'max_epochs': [1000, 2000, 5000],
+        'hidden_dim': [
+            # 512, 1024, 2048,
+                       10000,
+                    #    20000
+                       ],
+        'dropout_rate': [0.01,
+                        #  .005, .05, 0.1, 
+                         ],
+        # 'max_epochs': [1000, 2000, 5000],
         # 'patience': [10, 20, 50],
-        'lr': [.01, .005, .0005, .0001],
-        'weight_decay': [0.0, 0.01, 0.001],
+        'lr': [
+            # .01, .005, .0005, 
+               .0001],
+        'weight_decay': [0.0,
+                        #   0.01, 0.001
+                          ],
     }
-    
+    # {'hidden_dim': 10000, 'dropout_rate': 0.01, 'weight_decay': 0.0, 'lr': 0.0001}
     best_r2 = -np.inf 
     log_rmse = 0
     best_params = None
@@ -400,8 +408,35 @@ def reg_hyperparameter_tuning(X_train, y_train, X_test, y_test, device, model_na
                         'lr': lr
                     }
                     criterion = nn.MSELoss(reduction='mean')
+                    ############################# for kfold implemntation
+                    # avg_metrics_per_cv = {
+                    #     "mse": [],
+                    #     "mae": [],
+                    #     "rmse": [],
+                    #     "r2": [],
+                    #     "runtime": []
+                    # }
+                    # cv_losses = []
+                    # y_preds = []
+                    # for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X) if do_cv else [(range(len(X)), range(len(X)))]):
+                    #     print(f"Starting fold {fold_idx + 1}")
+                    #     X_train, X_val = X[train_idx], X[val_idx]
+                    #     y_train, y_val = y[train_idx], y[val_idx]
                     mse, mae, rmse, r2, runtime, model, outputs, epoch_losses = train_nn_early_stop_regression(X_train, y_train, 
                                                                                                                X_test, y_test, device, params_dict, criterion, model_name)
+                    
+                    #     plots.plot_predictions(y_val, outputs, fold_idx, model)
+                    #     torch.save(model.state_dict(), f"best_model_{model_name}.pth")
+                    #     avg_metrics_per_cv["mse"].append(mse)
+                    #     avg_metrics_per_cv["mae"].append(mae)
+                    #     avg_metrics_per_cv["rmse"].append(rmse)
+                    #     avg_metrics_per_cv["r2"].append(r2)
+                    #     avg_metrics_per_cv["runtime"].append(runtime)
+                    # # Log epoch losses and predictions
+                    # cv_losses.append(epoch_losses)
+                    # y_preds.append({"y_true": y_val.tolist(), "y_pred": outputs.tolist()})
+                    # Calculate average metrics across folds
+                    ######################################
                     model.eval()
                     with torch.no_grad():
                         y_pred = model(X_test)
@@ -431,8 +466,36 @@ def reg_hyperparameter_tuning(X_train, y_train, X_test, y_test, device, model_na
     label_encoder = LabelEncoder()
     for col in non_numeric_cols:
         df[col] = label_encoder.fit_transform(df[col])
+    nan_counts = df.isnull().sum()
+    print("Number of NaN values per column:")
+    print(nan_counts)
 
-    X_test = torch.tensor(df, dtype=torch.float32).to(device)  # Move to torch tensor
+    # Separate numerical and categorical columns
+    numerical_cols = df.select_dtypes(include=['number']).columns
+    categorical_cols = df.select_dtypes(exclude=['number']).columns
+
+    # Fill missing values
+    df[numerical_cols] = df[numerical_cols].fillna(df[numerical_cols].mean())  # Fill numerical columns with mean
+    # df[categorical_cols] = df[categorical_cols].fillna(df[categorical_cols].mode().iloc[0])  # Fill categorical columns with mode
+    for col in categorical_cols:
+        if df[col].mode().empty:
+            # If mode is not available (column is empty or all NaN), fill with a default value
+            df[col] = df[col].fillna("Unknown")  # Or any other default value like "Missing"
+        else:
+            # Otherwise, fill with the mode
+            try:
+                df[col] = df[col].fillna(df[col].mode().iloc[0])
+            except:
+                print(df[col].mode())
+
+    # Verify no NaN values remain
+    nan_counts_after = df.isnull().sum().sum()
+    if nan_counts_after == 0:
+        print("All NaN values have been successfully filled!")
+    else:
+        print(f"Remaining NaN values after filling: {nan_counts_after}")
+    
+    X_test = torch.tensor(df.values, dtype=torch.float32).to(device)  # Move to torch tensor
 
     # Evaluate the model
     best_model.eval()
@@ -446,7 +509,7 @@ def reg_hyperparameter_tuning(X_train, y_train, X_test, y_test, device, model_na
     })
 
     # Save to CSV
-    submission.to_csv("submission.csv", index=False)
+    submission.to_csv(f"submission_{model_name}.csv", index=False)
 
     
     print(f"Best R2: {best_r2:.4f}, RMSE {log_rmse:.4f}")

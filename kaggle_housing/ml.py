@@ -224,60 +224,47 @@ def get_eval_reg_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpa
                 X_train, X_val = X[train_idx], X[val_idx]
                 y_train, y_val = y[train_idx], y[val_idx]
 
-                # best_model, best_params,best_r2,log_rmse = reg_hyperparameter_tuning(X_train, y_train, X_val, y_val, device, model_name)
+                best_model, best_params,best_r2,log_rmse = reg_hyperparameter_tuning(X_train, y_train, X_val, y_val, device, model_name)
+
                 
-                
-                mse, mae, rmse, r2, runtime, model, outputs, epoch_losses = train_nn_early_stop_regression(
-                                                                                        X_train, y_train, X_val, y_val, device,
-                                                                                        nn.MSELoss(reduction='mean'), 
-                                                                                        3000, #NN_MAX_EPOCH,
-                                                                                        20, #NN_PATIENCE, 
-                                                                                        model_name)
+               
 
-                plots.plot_predictions(y_val, outputs, fold_idx, model)
-                torch.save(model.state_dict(), f"best_model_{model_name}.pth")
-                avg_metrics_per_cv["mse"].append(mse)
-                avg_metrics_per_cv["mae"].append(mae)
-                avg_metrics_per_cv["rmse"].append(rmse)
-                avg_metrics_per_cv["r2"].append(r2)
-                avg_metrics_per_cv["runtime"].append(runtime)
+    #             # Log epoch losses and predictions
+    #             cv_losses.append(epoch_losses)
+    #             y_preds.append({"y_true": y_val.tolist(), "y_pred": outputs.tolist()})
+    #         # Calculate average metrics across folds
+    #         nn_results[model_name] = {
+    #             "avg_mse": np.mean(avg_metrics_per_cv["mse"]),
+    #             "avg_mae": np.mean(avg_metrics_per_cv["mae"]),
+    #             "avg_rmse": np.mean(avg_metrics_per_cv["rmse"]),
+    #             "avg_r2": np.mean(avg_metrics_per_cv["r2"]),
+    #             "avg_runtime": np.mean(avg_metrics_per_cv["runtime"]),
+    #             "cv_losses": cv_losses,
+    #             "y_preds": y_preds,
+    #         }
 
-                # Log epoch losses and predictions
-                cv_losses.append(epoch_losses)
-                y_preds.append({"y_true": y_val.tolist(), "y_pred": outputs.tolist()})
-            # Calculate average metrics across folds
-            nn_results[model_name] = {
-                "avg_mse": np.mean(avg_metrics_per_cv["mse"]),
-                "avg_mae": np.mean(avg_metrics_per_cv["mae"]),
-                "avg_rmse": np.mean(avg_metrics_per_cv["rmse"]),
-                "avg_r2": np.mean(avg_metrics_per_cv["r2"]),
-                "avg_runtime": np.mean(avg_metrics_per_cv["runtime"]),
-                "cv_losses": cv_losses,
-                "y_preds": y_preds,
-            }
+    #         # Print summary for the current model
+    #         print(f"Model {model_name} results:")
+    #         print(f"  Average MSE: {nn_results[model_name]['avg_mse']:.4f}")
+    #         print(f"  Average MAE: {nn_results[model_name]['avg_mae']:.4f}")
+    #         print(f"  Average RMSE: {nn_results[model_name]['avg_rmse']:.4f}")
+    #         print(f"  Average R²: {nn_results[model_name]['avg_r2']:.4f}")
+    #         print(f"  Average Runtime: {nn_results[model_name]['avg_runtime']:.2f}s")
 
-            # Print summary for the current model
-            print(f"Model {model_name} results:")
-            print(f"  Average MSE: {nn_results[model_name]['avg_mse']:.4f}")
-            print(f"  Average MAE: {nn_results[model_name]['avg_mae']:.4f}")
-            print(f"  Average RMSE: {nn_results[model_name]['avg_rmse']:.4f}")
-            print(f"  Average R²: {nn_results[model_name]['avg_r2']:.4f}")
-            print(f"  Average Runtime: {nn_results[model_name]['avg_runtime']:.2f}s")
-
-        # with open(nn_performance_path, "wb") as f:
-        #     pickle.dump(nn_results, f, )
-        # with open(cv_losses_outpath, "wb") as f:
-        #     pickle.dump(cv_losses, f, )
-        # with open(y_pred_outpath, "wb") as f:
-        #     pickle.dump(y_preds, f,)
-    else:
-        with open(nn_performance_path, 'rb') as f:
-            nn_results = pickle.load(f)
-        with open(cv_losses_outpath, 'rb') as f:
-            cv_losses = pickle.load(f)
-        with open(y_pred_outpath, 'rb') as f:
-            y_preds = pickle.load(f)
-    return nn_results, cv_losses, y_preds
+    #     # with open(nn_performance_path, "wb") as f:
+    #     #     pickle.dump(nn_results, f, )
+    #     # with open(cv_losses_outpath, "wb") as f:
+    #     #     pickle.dump(cv_losses, f, )
+    #     # with open(y_pred_outpath, "wb") as f:
+    #     #     pickle.dump(y_preds, f,)
+    # else:
+    #     with open(nn_performance_path, 'rb') as f:
+    #         nn_results = pickle.load(f)
+    #     with open(cv_losses_outpath, 'rb') as f:
+    #         cv_losses = pickle.load(f)
+    #     with open(y_pred_outpath, 'rb') as f:
+    #         y_preds = pickle.load(f)
+    # return nn_results, cv_losses, y_preds
 
 
 
@@ -482,12 +469,30 @@ def save_results(results,filename ):
 
 def check_etl():
     X, y = etl.get_data()
-    data = pd.concat([X, y], axis=1)  # Concatenate X and y for easier manipulation
-    data_clean = data.dropna()  # Drop rows where any NaN is present in either X or y
+    df = pd.concat([X, y], axis=1)  # Concatenate X and y for easier manipulation
+
+    #######################
+    # Separate numerical and categorical columns
+    numerical_cols = df.select_dtypes(include=['number']).columns
+    categorical_cols = df.select_dtypes(exclude=['number']).columns
+
+    # Fill missing values
+    df[numerical_cols] = df[numerical_cols].fillna(df[numerical_cols].mean())  # Fill numerical columns with mean
+    # df[categorical_cols] = df[categorical_cols].fillna(df[categorical_cols].mode().iloc[0])  # Fill categorical columns with mode
+    for col in categorical_cols:
+        if df[col].mode().empty:
+            # If mode is not available (column is empty or all NaN), fill with a default value
+            df[col] = df[col].fillna("Unknown")  # Or any other default value like "Missing"
+        else:
+            # Otherwise, fill with the mode
+            try:
+                df[col] = df[col].fillna(df[col].mode().iloc[0])
+            except:
+                print(df[col].mode())
 
     # Split back into X and y after dropping NaN rows
-    X = data_clean.iloc[:, :-1]  # All columns except the last one (X)
-    y = data_clean.iloc[:, -1]  # Only the last column (y)
+    X = df.iloc[:, :-1]  # All columns except the last one (X)
+    y = df.iloc[:, -1]  # Only the last column (y)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.1, random_state=GT_ID)
     test_data_etl_input_check(X,y,X_train, X_test, y_train, y_test, show = True)
     etl.graph_raw_data(X, y)

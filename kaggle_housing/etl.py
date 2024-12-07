@@ -17,26 +17,6 @@ import pickle
 
 
 
-def get_pd_data(dataset, do_floor_cap, floor_cap_per):
-    pandas_df = pd.read_csv('../data/sp500_data_sparkdftocsv/part-00000-5d1b3de8-0339-48a0-ac2b-a0f474691b5b-c000.csv')
-    if do_floor_cap:
-        start_time = time.time()
-        print(f"applying floor at {floor_cap_per}, cap at {1-floor_cap_per}")
-        # Loop through each feature to apply capping and flooring
-        features_to_skip = ["bollinger_scaled","rsi_scaled",]
-        for feature in PYSPARK_FEATURES:
-            if feature in features_to_skip:
-                continue
-            upper_cap = pandas_df[feature].quantile(1-floor_cap_per)  # Calculate upper cap
-            lower_floor = pandas_df[feature].quantile(floor_cap_per)  # Calculate lower floor
-            # Apply capping
-            pandas_df[feature] = np.where(pandas_df[feature] > upper_cap, upper_cap, pandas_df[feature])
-            # Apply flooring
-            pandas_df[feature] = np.where(pandas_df[feature] < lower_floor, lower_floor, pandas_df[feature])
-        end_time = time.time()
-        print(("Time to apply capping/flooring: " + str(end_time - start_time) + "s"))
-    return pandas_df
-
 def get_sp500_data(dataset, do_scaling, do_pca, do_panda):
     if "sp500" in DATASET_SELECTION:
         # Load the data into a Pandas DataFrame

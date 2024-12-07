@@ -23,6 +23,7 @@ import random
 from copy import deepcopy
 import math
 import itertools
+import joblib
 
 from scipy.stats import ttest_1samp
 
@@ -457,7 +458,13 @@ def train_and_evaluate_dt(X_train, y_train, X_test, y_test):
             "MAE": mae,
             "R2": r2
         }
-    
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        model_path = os.path.join(
+            MODELS_OUTDIR, 
+            f"{model_name}_MSE-{mse:.4f}_R2-{r2:.4f}_MAE-{mae:.4f}_{timestamp}.joblib"
+        )
+        joblib.dump(model, model_path)
+        print(f"Model {model_name} saved at {model_path}")
     return results
 
 # Function to save results to a pickle file
@@ -469,33 +476,9 @@ def save_results(results,filename ):
 
 def check_etl():
     X, y = etl.get_data()
-    df = pd.concat([X, y], axis=1)  # Concatenate X and y for easier manipulation
-
-    #######################
-    # Separate numerical and categorical columns
-    numerical_cols = df.select_dtypes(include=['number']).columns
-    categorical_cols = df.select_dtypes(exclude=['number']).columns
-
-    # Fill missing values
-    df[numerical_cols] = df[numerical_cols].fillna(df[numerical_cols].mean())  # Fill numerical columns with mean
-    # df[categorical_cols] = df[categorical_cols].fillna(df[categorical_cols].mode().iloc[0])  # Fill categorical columns with mode
-    for col in categorical_cols:
-        if df[col].mode().empty:
-            # If mode is not available (column is empty or all NaN), fill with a default value
-            df[col] = df[col].fillna("Unknown")  # Or any other default value like "Missing"
-        else:
-            # Otherwise, fill with the mode
-            try:
-                df[col] = df[col].fillna(df[col].mode().iloc[0])
-            except:
-                print(df[col].mode())
-
-    # Split back into X and y after dropping NaN rows
-    X = df.iloc[:, :-1]  # All columns except the last one (X)
-    y = df.iloc[:, -1]  # Only the last column (y)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.1, random_state=GT_ID)
     test_data_etl_input_check(X,y,X_train, X_test, y_train, y_test, show = True)
-    etl.graph_raw_data(X, y)
+    # etl.graph_raw_data(X, y)
 
     print("======> Data verification complete")
     return X,y,X_train, X_test, y_train, y_test 
@@ -503,30 +486,32 @@ def check_etl():
 ###############
 def main(): 
     np.random.seed(GT_ID)
+    start_time = time.time()
     X,y,X_train, X_test, y_train, y_test  = check_etl()
     check_data_info(X, y, X_train, X_test, y_train, y_test, show = False)
+    print(f"Time to load data: {time.time() - start_time}s")
 
     ######
-    # result_save_file = f"{Y_PRED_OUTDIR}/results.pkl"
-    # if not os.path.exists(result_save_file):
-    #     results = train_and_evaluate_dt(X_train, y_train, X_test, y_test)
-    #     print("Model Evaluation Results:", results)
-    #     save_results(results, f"{Y_PRED_OUTDIR}/results.pkl")
-    # else:
-    #     with open(result_save_file, 'rb') as f:
-    #         results = pickle.load(f)
-    # res_vis_png_path = f"{AGGREGATED_OUTDIR}/results.png" 
-    # plots.plot_dt_results(results, res_vis_png_path)
+    result_save_file = f"{Y_PRED_OUTDIR}/results.pkl"
+    if not os.path.exists(result_save_file):
+        results = train_and_evaluate_dt(X_train, y_train, X_test, y_test)
+        print("Model Evaluation Results:", results)
+        save_results(results, f"{Y_PRED_OUTDIR}/results.pkl")
+    else:
+        with open(result_save_file, 'rb') as f:
+            results = pickle.load(f)
+    res_vis_png_path = f"{AGGREGATED_OUTDIR}/results.png" 
+    plots.plot_dt_results(results, res_vis_png_path)
 
     # nn_performance_path = f'{PERFM_PKL_OUTDIR}/perf_results.pkl'
     # cv_losses_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_losses.pkl'
     # y_pred_outpath = f'{Y_PRED_OUTDIR}/y_pred_compare.pkl' 
     # get_eval_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpath, do_cv = 0)
 
-    # nn_performance_reg_path = f'{PERFM_PKL_OUTDIR}/perf_reg_results.pkl'
-    # cv_losses_reg_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_reg_losses.pkl'
-    # y_pred_reg_outpath = f'{Y_PRED_OUTDIR}/y_pred_reg_compare.pkl' 
-    # nn_results, cv_losses, y_preds = get_eval_reg_with_nn(X,y,nn_performance_reg_path,cv_losses_reg_outpath, y_pred_reg_outpath, do_cv = 0)
+    nn_performance_reg_path = f'{PERFM_PKL_OUTDIR}/perf_reg_results.pkl'
+    cv_losses_reg_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_reg_losses.pkl'
+    y_pred_reg_outpath = f'{Y_PRED_OUTDIR}/y_pred_reg_compare.pkl' 
+    nn_results, cv_losses, y_preds = get_eval_reg_with_nn(X,y,nn_performance_reg_path,cv_losses_reg_outpath, y_pred_reg_outpath, do_cv = 0)
  
 
 if __name__ == "__main__":

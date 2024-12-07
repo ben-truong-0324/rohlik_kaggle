@@ -13,7 +13,10 @@ import os
 CALENDAR_PATH = os.path.join(os.getcwd(), 'data', 'calendar.csv')
 INVENTORY_PATH = os.path.join(os.getcwd(), 'data', 'inventory.csv')
 TRAIN_PATH = os.path.join(os.getcwd(), 'data', 'sales_train.csv')
+PROCESSED_TRAIN_PATH = os.path.join(os.getcwd(), 'data', 'sales_train_processed.csv')
+
 TEST_PATH = os.path.join(os.getcwd(), 'data', 'sales_test.csv')
+
 
 
 DATASET_SELECTION = "kaggle_rohlik_sales" #kaggle_housing #kaggle_housing_test
@@ -56,6 +59,8 @@ AGGREGATED_OUTDIR = set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUN
 Y_PRED_OUTDIR = set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/y_pred_graphs')
 CV_LOSSES_PKL_OUTDIR = set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/pkl_cv')
 PERFM_PKL_OUTDIR = set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/perf_pkl')
+MODELS_OUTDIR = set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/saved_models')
+
 
 TXT_OUTDIR = set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/txt_stats')
 OUTPUT_DIR_RAW_DATA_A3 =set_output_dir(OUTPUT_DIR_A3 / f'ver{DRAFT_VER_A3}_{EVAL_FUNC_METRIC}/raw_data_assessments')

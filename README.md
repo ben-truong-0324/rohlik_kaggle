@@ -16,10 +16,9 @@ To set up the project, it is recommended to use the provided `environment.yml` f
 ```bash
 conda env create -f environment.yml
 conda activate ml_general
+python -m rohlik_sales.ml
 
-# download/copy data into raw.txt in ./data/raw.txt
-python -m kaggle_housing/etl.py
-python -m kaggle_housing/dt.py
+# download/copy data into ./data/
 ```
 
 ## License

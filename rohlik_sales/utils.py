@@ -280,15 +280,12 @@ def check_data_info(X, y, X_train, X_test, y_train, y_test, show = False):
 
 def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,params_dict ,criterion, model_name="default"):
     input_dim = X_train.shape[1]
-   
     if isinstance(criterion, (nn.MSELoss, nn.L1Loss)):  # Check if the criterion is a regression loss
         output_dim = 1  # Regression tasks always have a single continuous output
     else:
         if len(y_train.shape) > 1 and y_train.shape[1] > 1:
-            # Multi-label classification (y_train has multiple labels per instance)
             output_dim = y_train.shape[1]  # Number of labels
         else:
-            # Single-label classification (y_train has a single label per instance)
             output_dim = len(np.unique(y_train.cpu()))
     max_epochs = 5000
     patience = 50
@@ -358,18 +355,40 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
     mae = mean_absolute_error(y_test, outputs)
     rmse = np.sqrt(mse)
     r2 = r2_score(y_test, outputs)
-
-    # print(f"Training terminated after epoch {epoch_trained}, "
-    #       f"MSE: {mse:.4f}, "
-    #       f"MAE: {mae:.4f}, "
-    #       f"RMSE: {rmse:.4f}, "
-    #       f"R²: {r2:.4f}")
-    return mse, mae, rmse, r2, runtime, model, outputs, epoch_losses
+    return mse, mae, rmse, r2, runtime, model, epoch_losses
 
 
+def save_model_log_results(best_cv_perfs, best_params,best_eval_func,best_models_ensemble, model_name):
+    print(f"Best Hyperparameters: {best_params}")
+    print(f"Best {EVAL_FUNC_METRIC.upper()} across all folds: {best_eval_func:.4f}")
+    for idx, model in enumerate(best_models_ensemble):
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        model_path = os.path.join(
+            MODELS_OUTDIR, 
+            f"{model_name}_fold_{idx + 1}_{timestamp}.joblib"
+        )
+        joblib.dump(model, model_path)
+        print(f"Saved model for fold {idx + 1} at: {model_path}")
 
+    log_entry = (
+        f"Model: {model_name}\n"
+        f"Saved Path: {model_name}_fold_x_yymmddhhmmss.joblib\n"  
+        f"Timestamp: {timestamp}\n"
+        f"{EVAL_FUNC_METRIC.upper()}: {eval_metric_value:.4f}\n"
+        f"Best Hyperparameters: {best_params}\n"
+        f"Cross-validation Performance:\n"
+        f"    MSE: {best_cv_perfs['MSE']:.4f}\n"
+        f"    MAE: {best_cv_perfs['MAE']:.4f}\n"
+        f"    RMSE: {best_cv_perfs['RMSE']:.4f}\n"
+        f"    R2: {best_cv_perfs['R2']:.4f}\n"
+        f"    Runtime: {best_cv_perfs['runtime']:.2f} seconds\n"
+        
+        f"{'#' * 50}\n"
+    )
+    with open(MODEL_ALL_LOG_FILE, "a") as log_file:
+        log_file.write(log_entry)
 
-def reg_hyperparameter_tuning(X_train, y_train, X_test, y_test, device, model_name):
+def reg_hyperparameter_tuning(X,y, device, model_name):
     # Define hyperparameter grid
     param_grid = {
         'hidden_dim': [
@@ -389,11 +408,10 @@ def reg_hyperparameter_tuning(X_train, y_train, X_test, y_test, device, model_na
                         #   0.01, 0.001
                           ],
     }
-    # {'hidden_dim': 10000, 'dropout_rate': 0.01, 'weight_decay': 0.0, 'lr': 0.0001}
-    best_r2 = -np.inf 
-    log_rmse = 0
+    best_eval_func = -np.inf 
     best_params = None
-    best_model = None
+    best_models_ensemble = None
+    best_cv_perfs = None
 
     # Loop through hyperparameters
     for hidden_dim in param_grid['hidden_dim']:
@@ -409,109 +427,45 @@ def reg_hyperparameter_tuning(X_train, y_train, X_test, y_test, device, model_na
                     }
                     criterion = nn.MSELoss(reduction='mean')
                     ############################# for kfold implemntation
-                    # avg_metrics_per_cv = {
-                    #     "mse": [],
-                    #     "mae": [],
-                    #     "rmse": [],
-                    #     "r2": [],
-                    #     "runtime": []
-                    # }
-                    # cv_losses = []
-                    # y_preds = []
-                    # for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X) if do_cv else [(range(len(X)), range(len(X)))]):
-                    #     print(f"Starting fold {fold_idx + 1}")
-                    #     X_train, X_val = X[train_idx], X[val_idx]
-                    #     y_train, y_val = y[train_idx], y[val_idx]
-                    mse, mae, rmse, r2, runtime, model, outputs, epoch_losses = train_nn_early_stop_regression(X_train, y_train, 
-                                                                                                               X_test, y_test, device, params_dict, criterion, model_name)
-                    
-                    #     plots.plot_predictions(y_val, outputs, fold_idx, model)
-                    #     torch.save(model.state_dict(), f"best_model_{model_name}.pth")
-                    #     avg_metrics_per_cv["mse"].append(mse)
-                    #     avg_metrics_per_cv["mae"].append(mae)
-                    #     avg_metrics_per_cv["rmse"].append(rmse)
-                    #     avg_metrics_per_cv["r2"].append(r2)
-                    #     avg_metrics_per_cv["runtime"].append(runtime)
-                    # # Log epoch losses and predictions
-                    # cv_losses.append(epoch_losses)
-                    # y_preds.append({"y_true": y_val.tolist(), "y_pred": outputs.tolist()})
-                    # Calculate average metrics across folds
-                    ######################################
-                    model.eval()
-                    with torch.no_grad():
-                        y_pred = model(X_test)
-                        r2 = r2_score(y_test.cpu(), y_pred.cpu())
-                        rmse = np.sqrt(mean_squared_error(y_test.cpu(), y_pred.cpu()))
+                    avg_metrics_per_cv = {
+                        "MSE": [],
+                        "MAE": [],
+                        "RMSE": [],
+                        "R2": [],
+                        "runtime": []
+                    }
+                    cv_losses = []
+                    fold_models = [] 
+                    for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X) if do_cv else [(range(len(X)), range(len(X)))]):
+                        print(f"Starting fold {fold_idx + 1}")
+                        X_train, X_val = X[train_idx], X[val_idx]
+                        y_train, y_val = y[train_idx], y[val_idx]
+                        mse, mae, rmse, r2, runtime, model, epoch_losses = train_nn_early_stop_regressio(
+                                            X_train, y_train, X_val, y_val, 
+                                            device, params_dict, criterion, model_name)
+                        avg_metrics_per_cv["MSE"].append(mse)
+                        avg_metrics_per_cv["MAE"].append(mae)
+                        avg_metrics_per_cv["RMSE"].append(rmse)
+                        avg_metrics_per_cv["R2"].append(r2)
+                        avg_metrics_per_cv["runtime"].append(runtime)
+                        cv_losses.append(epoch_losses)
+                        fold_models.append(model)
+                    #once get the average of all folds
+                    for metric, values in avg_metrics_per_cv.items():
+                        avg_metrics_per_cv[metric] = np.mean(values)
+                    eval_metric_value = {
+                        "mse": avg_metrics_per_cv["MSE"],
+                        "mae": avg_metrics_per_cv["MAE"],
+                        "rmse": avg_metrics_per_cv["RMSE"],
+                        "r2": avg_metrics_per_cv["R2"]
+                    }.get(EVAL_FUNC_METRIC.lower(), avg_metrics_per_cv["MAE"])  # Default to MAE if metric is undefined
 
-                    print(f"For params of \n{params_dict}\nR2: {r2:.4f}, RMSE: {rmse:.4f}")
-
-                    # Check if this is the best model so far
-                    if r2 > best_r2:
-                        best_r2 = r2
-                        log_rmse = rmse
-                        best_params = {
-                            'hidden_dim': hidden_dim,
-                            'dropout_rate': dropout_rate,
-                            'weight_decay': weight_decay,
-                            'lr': lr
-                        }
-                        best_model = model
-
-    # Evaluate test sample with test.csv model
-    test_data  = pd.read_csv(KAGGLE_TEST_DATASET_PATH)
-    test_ids = test_data["Id"]
-    
-    df = test_data.drop(columns=['Id'])  # Assuming 'Id' is the first column
-    non_numeric_cols = df.select_dtypes(exclude=['number']).columns.tolist()
-    label_encoder = LabelEncoder()
-    for col in non_numeric_cols:
-        df[col] = label_encoder.fit_transform(df[col])
-    nan_counts = df.isnull().sum()
-    print("Number of NaN values per column:")
-    print(nan_counts)
-
-    # Separate numerical and categorical columns
-    numerical_cols = df.select_dtypes(include=['number']).columns
-    categorical_cols = df.select_dtypes(exclude=['number']).columns
-
-    # Fill missing values
-    df[numerical_cols] = df[numerical_cols].fillna(df[numerical_cols].mean())  # Fill numerical columns with mean
-    # df[categorical_cols] = df[categorical_cols].fillna(df[categorical_cols].mode().iloc[0])  # Fill categorical columns with mode
-    for col in categorical_cols:
-        if df[col].mode().empty:
-            # If mode is not available (column is empty or all NaN), fill with a default value
-            df[col] = df[col].fillna("Unknown")  # Or any other default value like "Missing"
-        else:
-            # Otherwise, fill with the mode
-            try:
-                df[col] = df[col].fillna(df[col].mode().iloc[0])
-            except:
-                print(df[col].mode())
-
-    # Verify no NaN values remain
-    nan_counts_after = df.isnull().sum().sum()
-    if nan_counts_after == 0:
-        print("All NaN values have been successfully filled!")
-    else:
-        print(f"Remaining NaN values after filling: {nan_counts_after}")
-    
-    X_test = torch.tensor(df.values, dtype=torch.float32).to(device)  # Move to torch tensor
-
-    # Evaluate the model
-    best_model.eval()
-    with torch.no_grad():
-        y_pred = best_model(X_test).cpu().numpy()  # Move predictions back to CPU and convert to NumPy
-
-    # Merge predictions with IDs
-    submission = pd.DataFrame({
-        "Id": test_ids,
-        "SalePrice": y_pred.flatten()  # Flatten to ensure 1D array for SalePrice
-    })
-
-    # Save to CSV
-    submission.to_csv(f"submission_{model_name}.csv", index=False)
-
-    
-    print(f"Best R2: {best_r2:.4f}, RMSE {log_rmse:.4f}")
-    print(f"Best Hyperparameters: {best_params}")
-    return best_model, best_params,best_r2,log_rmse
+                    # Compare overall performance to global best
+                    if eval_metric_value > best_eval_func:
+                        print(f"New global best model found for {EVAL_FUNC_METRIC}: {eval_metric_value:.4f}")
+                        best_eval_func = eval_metric_value
+                        best_params = params_dict
+                        best_cv_perfs = avg_metrics_per_cv
+                        best_models_ensemble = fold_models
+    save_model_log_results(best_cv_perfs, best_params,best_eval_func,best_models_ensemble, model_name)
+    return best_cv_perfs, best_params,best_eval_func, best_models_ensemble

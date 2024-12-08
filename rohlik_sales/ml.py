@@ -26,6 +26,7 @@ from copy import deepcopy
 import math
 import itertools
 import joblib
+import xgboost as xgb
 
 from scipy.stats import ttest_1samp
 
@@ -208,8 +209,6 @@ def get_eval_reg_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpa
 
         ###################################
         for model_name in EVAL_REG_MODELS:
-            
-
             # avg_metric_per_cv = [0 for _ in range(K_FOLD_CV)] if do_cv else [0]
             # Initialize placeholders for cross-validation metrics
             avg_metrics_per_cv = {
@@ -386,6 +385,7 @@ def get_eval_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpath, 
 
 def evaluate_metrics_in_context(y_true, y_pred, model_name, file_path=f"{TXT_OUTDIR}/dt_model_results.txt"):
     # Calculate MSE, MAE, and R²
+    print(f"For model {model_name}:")
     mse = mean_squared_error(y_true, y_pred)
     mae = mean_absolute_error(y_true, y_pred)
     r2 = r2_score(y_true, y_pred)
@@ -422,59 +422,94 @@ def train_and_evaluate_dt(X_train, y_train, X_test, y_test):
     dt = DecisionTreeRegressor(random_state=GT_ID)
     bagging = BaggingRegressor(estimator =dt, n_estimators=50, random_state=GT_ID)
     boosting = GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, random_state=GT_ID)
+    # Initialize XGBoost model (sklearn-compatible)
+    xgboost_model = xgb.XGBRegressor(objective="reg:squarederror", random_state=GT_ID)
     
-    # GridSearchCV for tuning Decision Tree
-    param_grid = {
-        'max_depth': [3, 5, 10],
-        'min_samples_split': [2, 5],
-        'min_samples_leaf': [1, 2]
-    }
+    param_grid = {  'max_depth': [3, 5, 10],
+                    'min_samples_split': [2, 5],
+                    'min_samples_leaf': [1, 2]}
     grid_search = GridSearchCV(dt, param_grid, cv=5, scoring='neg_mean_squared_error')
     
     # Fit models
     models = {
         "Default Decision Tree": dt,
-        "Tuned Decision Tree (GridSearch)": grid_search,
         "Bagging with Decision Tree": bagging,
-        "Boosting with Decision Tree": boosting
+        "Boosting with Decision Tree": boosting,
+        "XGBoost": xgboost_model,
+        "Tuned Decision Tree (GridSearch)": grid_search,
     }
-    
     results = {}
-    
     for model_name, model in models.items():
+        start_time = time.time()
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
-
-        print(f"For model {model_name}:")
         evaluate_metrics_in_context(y_test, y_pred, model_name)
         if len(y_test) <= 1000: # Only plot if y_test has 1000 or fewer values
             plots.plot_predictions_vs_actuals( y_test, y_pred, model_name,
                                  f"{AGGREGATED_OUTDIR}/pred_actual_diff_{model_name}.png")
-        else:
-            print(f"Skipping plot for {model_name} as y_test has more than 1000 values.")
-    
+        else: print(f"Skipping plot for {model_name} as y_test has more than 1000 values.")
         # Calculate losses
         mse = mean_squared_error(y_test, y_pred)
         mae = mean_absolute_error(y_test, y_pred)
         r2 = r2_score(y_test, y_pred)
-        
+        rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+        model_params = model.get_params() if hasattr(model, 'get_params') else None
+
         results[model_name] = {
             "MSE": mse,
             "MAE": mae,
-            "R2": r2
+            "RMSE": rmse,
+            "R2": r2,
+            "runtime": time.time() - start_time,
+            'params': model_params,
         }
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         model_path = os.path.join(
-            MODELS_OUTDIR, 
-            f"{model_name}_MSE-{mse:.4f}_R2-{r2:.4f}_MAE-{mae:.4f}_{timestamp}.joblib"
+            MODELS_OUTDIR,
+            f"{model_name}_{timestamp}.joblib"
         )
         joblib.dump(model, model_path)
         print(f"Model {model_name} saved at {model_path}")
+        log_entry = (
+            f"Model: {model_name}\n"
+            f"Saved Path: {model_path}\n"
+            f"Timestamp: {timestamp}\n"
+            f"MSE: {results[model_name]['MSE']:.4f}\n"
+            f"MAE: {results[model_name]['MAE']:.4f}\n"
+            f"RMSE: {results[model_name]['RMSE']:.4f}\n"
+            f"R2: {results[model_name]['R2']:.4f}\n"
+            f"Runtime: {results[model_name]['Runtime']:.2f} seconds\n"
+            f"Model Hyperparameters: {model_params}\n"  
+            f"{'#' * 50}\n"
+        )
+        # Append the log entry to the text file
+        with open(MODEL_ALL_LOG_FILE, "a") as log_file:
+            log_file.write(log_entry)
     return results
 
-# Function to save results to a pickle file
-def save_results(results,filename ):
+# Function to train and evaluate the Decision Tree Regressor with different configurations
+def train_and_evaluate_mpl(X,y):
+    # Initialize models
+    results = {}
+    X = torch.FloatTensor(X.values).to(device)
+    y = torch.FloatTensor(y).to(device)
+    for model_name in EVAL_REG_MODELS:
+        model_start_time = time.time()
+        best_cv_perfs, best_params,best_eval_func = reg_hyperparameter_tuning(X,y, device, model_name)
+        results[model_name] = {
+            "MSE": best_cv_perfs['MSE'],  
+            "MAE": best_cv_perfs['MAE'],  
+            "RMSE": best_cv_perfs['RMSE'],  
+            "R2": best_cv_perfs['R2'],  
+            "All folds runtime": time.time() - model_start_time,  
+            "Per fold runtime": best_cv_perfs['runtime'],
+            "params": best_params, 
+        }
+    return results
+        
 
+def save_results(results,filename ):
+    print("Model Evaluation Results:", results)
     with open(filename, 'wb') as f:
         pickle.dump(results, f)
     print(f"Results saved to {filename}")
@@ -488,6 +523,43 @@ def check_etl():
     print("======> Data verification complete")
     return X,y,X_train, X_test, y_train, y_test 
 
+def get_solutions(X_train):
+    X_test, solution_id = etl.get_test_data()
+    print(X_train.info())
+    print(X_test.info())
+    model_files = [f for f in os.listdir(MODELS_OUTDIR) if f.endswith('.joblib')]
+    inferred_models = []
+    for model_file in model_files:
+        inferred = False
+        model_name = ''
+        # Check if models with folds aka MPL 
+        if "_fold_" in model_file:
+            model_name = model_file.split('_fold_')[0]
+            if model_name not in inferred_models:
+                print(f"Loading ensemble models for {model_name}")
+                fold_models = [
+                    joblib.load(os.path.join(MODELS_OUTDIR, model_file))
+                    for model_file in model_files if model_file.startswith(f"{model_name}_fold_")
+                ]
+                predictions = np.mean([model.predict(X_test) for model in fold_models], axis=0)
+                inferred_models.append(model_name)
+                inferred = True
+        else: #no CV aka DT models
+            model_name = model_file.split('_')[0]
+            if model_name not in inferred_models:
+                print(f"Loading individual model for {model_name}")
+                model = joblib.load(os.path.join(MODELS_OUTDIR, f"{model_name}_{timestamp}.joblib"))
+                predictions = model.predict(X_test)
+                inferred_models.append(model_name)
+                inferred = True
+        if inferred:
+            results_df = pd.DataFrame({
+                'id': solution_id,
+                'sales_hat': predictions
+            })
+            result_file =  os.path.join(SOLUTIONS_OUTDIR, f"solutions_{model_name}.csv") 
+            results_df.to_csv(result_file, index=False)
+            print(f"Predictions for {model_name} saved in {result_file}")
 ###############
 def main(): 
     np.random.seed(GT_ID)
@@ -495,37 +567,31 @@ def main():
     X,y,X_train, X_test, y_train, y_test  = check_etl()
     check_data_info(X, y, X_train, X_test, y_train, y_test, show = False)
     print(f"Time to load data: {time.time() - start_time}s")
+    do_skl_train = 0
+    do_torch_train = 0
 
-    ######
-    result_save_file = f"{Y_PRED_OUTDIR}/results.pkl"
-    if not os.path.exists(result_save_file):
-        results = train_and_evaluate_dt(X_train, y_train, X_test, y_test)
-        print("Model Evaluation Results:", results)
-        save_results(results, f"{Y_PRED_OUTDIR}/results.pkl")
-    else:
-        with open(result_save_file, 'rb') as f:
-            results = pickle.load(f)
+    ###### Sklearn models (just DT for now)
+    if do_skl_train:
+        dt_result_save_file = f"{Y_PRED_OUTDIR}/dt_results.pkl"
+        if not os.path.exists(dt_result_save_file):
+            results = train_and_evaluate_dt(X_train, y_train, X_test, y_test)
+            save_results(results, f"{Y_PRED_OUTDIR}/dt_results.pkl")
+        # else:
+            # with open(dt_result_save_file, 'rb') as f:
+            #     results = pickle.load(f)
+    ####### Torch models (just MPL for now)
+    if do_torch_train:
+        mpl_result_save_file = f"{Y_PRED_OUTDIR}/mpl_results.pkl"
+        if not os.path.exists(mpl_result_save_file):
+            results = train_and_evaluate_mpl(X,y)
+            save_results(results, f"{Y_PRED_OUTDIR}/mpl_results.pkl")
+        # else:
+        #     with open(mpl_result_save_file, 'rb') as f:
+        #         results = pickle.load(f)
 
-    X_test, solution_id = etl.get_test_data()
-    print(X_train.info())
-    print(X_test.info())
-
-
-    model_files = [f for f in os.listdir(MODELS_OUTDIR) if f.endswith('.joblib')]
-
-    # Loop through the models, load each one, and use it for predictions
-    for model_file in model_files:
-        # Full path to the model file
-        model_path = os.path.join(MODELS_OUTDIR, model_file)
-        loaded_model = joblib.load(model_path)
-        predictions = loaded_model.predict(X_new)  # Replace X_new with your actual test data
-        results_df = pd.DataFrame({
-            'id': solution_id,
-            'sales_hat': predictions
-        })
-        result_file =  os.path.join(SOLUTIONS_OUTDIR, f"solutions_{model_file.replace('.joblib', '')}.csv") 
-        results_df.to_csv(result_file, index=False)
-        print(f"Predictions for {model_file} saved in {result_file}")
+    ######## done training, now inference and derive solutions.csv
+    get_solutions(X_train)
+    
 
 
 

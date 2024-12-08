@@ -42,6 +42,8 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 
+from sklearn.cluster import KMeans
+import numpy as np
 
 class MLPRegression(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_dim=2048, dropout_rate=0.1):
@@ -50,8 +52,8 @@ class MLPRegression(nn.Module):
         
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, hidden_dim // 2)
-        self.fc3 = nn.Linear(hidden_dim // 2, hidden_dim // 8)
-        self.fc4 = nn.Linear(hidden_dim // 8, output_dim)
+        self.fc3 = nn.Linear(hidden_dim // 2, hidden_dim // 4)
+        self.fc4 = nn.Linear(hidden_dim // 4, output_dim)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
@@ -92,8 +94,6 @@ class LSTMRegression(nn.Module):
         output = self.fc(lstm_out[:, -1, :])  # Use the last output of the LSTM for regression
         return output
 
-from sklearn.cluster import KMeans
-import numpy as np
 
 class SalienceNNRegression(nn.Module):
     def __init__(self, input_dim, output_dim,hidden_dim, n_clusters=128):

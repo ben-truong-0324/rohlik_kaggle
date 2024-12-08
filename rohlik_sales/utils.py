@@ -15,6 +15,7 @@ import rohlik_sales.hypotheses
 from src.models import *
 from src.models_reg import *
 from rohlik_sales.config import *
+import joblib
 
 import math
 from sklearn.preprocessing import LabelEncoder
@@ -47,7 +48,6 @@ from sklearn.model_selection import KFold
 from torch import nn, optim
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-
 
 def set_random_seed(seed): #use for torch nn training in MC simulation
     torch.manual_seed(seed)
@@ -287,8 +287,16 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
             output_dim = y_train.shape[1]  # Number of labels
         else:
             output_dim = len(np.unique(y_train.cpu()))
-    max_epochs = 5000
-    patience = 50
+    max_epochs = 25
+    patience = 5
+    # Create DataLoaders for training and testing
+    train_dataset = TensorDataset(X_train, y_train)
+    test_dataset = TensorDataset(X_test, y_test)
+
+    batch_size = params_dict.get('batch_size', 8192)  # Default batch size if not specified
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
     if model_name == "MPL":
         model = MLPRegression(
             input_dim,
@@ -299,7 +307,7 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
     elif model_name == "LSTM":
         model = LSTMRegression(input_dim, output_dim, hidden_dim=params_dict['hidden_dim'], num_layers=1, dropout_rate=params_dict['dropout_rate']).to(device)
     elif model_name == "SalienceNN":
-        model = LSTMRegression(input_dim, output_dim, hidden_dim=params_dict['hidden_dim'], num_layers=1, dropout_rate=params_dict['dropout_rate']).to(device)
+        model = SalienceNNRegression(input_dim, output_dim,hidden_dim=params_dict['hidden_dim'],dropout_rate=params_dict['dropout_rate']).to(device)
     elif model_name == "CNN":
         model = CNNRegression(input_dim, output_dim, kernel_size=2, hidden_dim=params_dict['hidden_dim'], dropout_rate=params_dict['dropout_rate']).to(device)
    
@@ -313,23 +321,42 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
 
     start_time = time.time()
     for epoch in range(max_epochs):
+        epoch_start_time = time.time() 
         model.train()
-        optimizer.zero_grad()
-        # Forward pass for training
-        outputs_train = model(X_train).squeeze()
-        train_loss = criterion(outputs_train, y_train)
-        # Backward pass
-        train_loss.backward()
-        optimizer.step()
+        train_epoch_loss = 0.0
+
+        for batch_idx, (batch_X, batch_y) in enumerate(train_loader):
+            batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+            optimizer.zero_grad()
+            outputs_train = model(batch_X).squeeze()
+            train_loss = criterion(outputs_train, batch_y)
+            train_loss.backward()
+            optimizer.step()
+            train_epoch_loss += train_loss.item() * len(batch_X)  # Accumulate loss
+            
+           
+        # Average train loss for the epoch
+        train_epoch_loss /= len(train_loader.dataset)
+
         # Evaluate on test set
         model.eval()
+        eval_epoch_loss = 0.0
         with torch.no_grad():
-            outputs_eval = model(X_test).squeeze()
-            eval_loss = criterion(outputs_eval, y_test)
+            for batch_idx, (batch_X, batch_y) in enumerate(test_loader):
+                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                outputs_eval = model(batch_X).squeeze()
+                eval_loss = criterion(outputs_eval, batch_y)
+                eval_epoch_loss += eval_loss.item() * len(batch_X)
+                
+        # Average eval loss for the epoch
+        eval_epoch_loss /= len(test_loader.dataset)
+        epoch_losses.append((train_epoch_loss, eval_epoch_loss))
+        epoch_runtime = time.time() - epoch_start_time
+        print(f"Epoch {epoch + 1}/{max_epochs} - Train Loss: {train_epoch_loss:.4f}, Eval Loss: {eval_epoch_loss:.4f}, Runtime: {epoch_runtime:.2f} seconds")
 
         # Early stopping logic
-        if eval_loss.item() < best_loss:
-            best_loss = eval_loss.item()
+        if eval_epoch_loss < best_loss:
+            best_loss = eval_epoch_loss
             patience_counter = 0
             best_model_state = model.state_dict()  # Save the best model
         else:
@@ -393,12 +420,12 @@ def save_model_log_results(best_cv_perfs, best_params,best_eval_func,best_models
     with open(MODEL_ALL_LOG_FILE, "a") as log_file:
         log_file.write(log_entry)
 
-def reg_hyperparameter_tuning(X,y, device, model_name):
+def reg_hyperparameter_tuning(X,y, device, model_name, do_cv=0):
     # Define hyperparameter grid
     param_grid = {
-        'hidden_dim': [512,
+        'hidden_dim': [64,
             # 512, 1024, 2048,
-                       10000,
+                    #    10000,
                     #    20000
                        ],
         'dropout_rate': [0.001,
@@ -417,6 +444,7 @@ def reg_hyperparameter_tuning(X,y, device, model_name):
     best_params = None
     best_models_ensemble = None
     best_cv_perfs = None
+    kf = KFold(n_splits=K_FOLD_CV, shuffle=True, random_state=GT_ID)
 
     # Loop through hyperparameters
     for hidden_dim in param_grid['hidden_dim']:

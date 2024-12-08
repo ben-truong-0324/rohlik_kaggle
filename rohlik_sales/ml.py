@@ -485,7 +485,7 @@ def train_and_evaluate_dt(X_train, y_train, X_test, y_test):
             f"MAE: {results[model_name]['MAE']:.4f}\n"
             f"RMSE: {results[model_name]['RMSE']:.4f}\n"
             f"R2: {results[model_name]['R2']:.4f}\n"
-            f"Runtime: {results[model_name]['Runtime']:.2f} seconds\n"
+            f"Runtime: {results[model_name]['runtime']:.2f} seconds\n"
             f"Model Hyperparameters: {model_params}\n"  
             f"{'#' * 50}\n"
         )
@@ -502,7 +502,7 @@ def train_and_evaluate_mpl(X,y):
     y = torch.FloatTensor(y).to(device)
     for model_name in EVAL_REG_MODELS:
         model_start_time = time.time()
-        best_cv_perfs, best_params,best_eval_func = reg_hyperparameter_tuning(X,y, device, model_name)
+        best_cv_perfs, best_params,best_eval_func = reg_hyperparameter_tuning(X,y, device, model_name,1)
         results[model_name] = {
             "MSE": best_cv_perfs['MSE'],  
             "MAE": best_cv_perfs['MAE'],  
@@ -570,7 +570,7 @@ def get_solutions(X_train):
 ###############
 def main(): 
     np.random.seed(GT_ID)
-    do_skl_train = 1
+    do_skl_train = 0
     do_torch_train = 1
     start_time = time.time()
     X,y,X_train, X_test, y_train, y_test  = check_etl()

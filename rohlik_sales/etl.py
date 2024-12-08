@@ -207,7 +207,7 @@ def get_data():
                 print("Missing values in each column:")
                 print(nan_summary[nan_summary > 0])
                 print("updated processed sales_train")
-                sales_train.drop(columns=['sales', 'availability','date','unique_id'])
+                sales_train = sales_train.drop(columns=['sales', 'availability','date','unique_id'])
                 sales_train.to_pickle(PROCESSED_TRAIN_PATH)
                 print(f"DataFrame updated and saved as pickle file: {PROCESSED_TRAIN_PATH}")
                 print(sales_train.head())
@@ -401,8 +401,7 @@ def get_test_data():
 
                 sales_test['product_num'] = pd.to_numeric(sales_test['product_num'], errors='coerce')
                 sales_test['cat_num'] = pd.to_numeric(sales_test['product_num'], errors='coerce')
-                sales_test.drop(columns=['date','unique_id'])
-                # sales_train.drop(columns=['sales', 'availability','date','unique_id'])
+                sales_test.drop(columns=['date','unique_id'], inplace=True)
                 print("updated processed sales_test")
                 sales_test.to_pickle(PROCESSED_TEST_PATH)
                 print(f"DataFrame updated and saved as pickle file: {PROCESSED_TEST_PATH}")

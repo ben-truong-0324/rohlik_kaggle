@@ -187,7 +187,7 @@ def get_data():
                 label_encoders = {}
                 for col in ['warehouse', 'product_name', 'cat_name']:
                     le = LabelEncoder()
-                    X_df[col] = le.fit_transform(X_df[col])
+                    sales_train[col] = le.fit_transform(sales_train[col])
                     label_encoders[col] = le  # Store the encoder for this column
                 with open( f"{LABEL_ENCODERS_PKL_OUTDIR}/lencoders.pkl", "wb") as f:
                     pickle.dump(label_encoders, f)
@@ -207,6 +207,7 @@ def get_data():
                 print("Missing values in each column:")
                 print(nan_summary[nan_summary > 0])
                 print("updated processed sales_train")
+                sales_train.drop(columns=['sales', 'availability','date','unique_id'])
                 sales_train.to_pickle(PROCESSED_TRAIN_PATH)
                 print(f"DataFrame updated and saved as pickle file: {PROCESSED_TRAIN_PATH}")
                 print(sales_train.head())
@@ -222,11 +223,12 @@ def get_data():
             #load pickl
             sales_train = pd.read_pickle(PROCESSED_TRAIN_PATH)
         print("retreived sales_train")
-        ############ nan qa
-        sales_train = sales_train.dropna(subset=['sales'])
+       
+        print(f"DataFrame updated and saved as pickle file: {PROCESSED_TRAIN_PATH}")
+
         ###############
         Y_df = sales_train['sales_whole']  # Target variable
-        X_df = sales_train.drop(columns=['sales', 'availability', 'sales_whole','date','unique_id'])
+        X_df = sales_train.drop(columns=[ 'sales_whole'])
         print(X_df.info())
         print(Y_df.info())
     else: 
@@ -334,13 +336,17 @@ def inspect_pickle_content(pkl_path):
 def get_test_data():
     print(f"Getting test data for {DATASET_SELECTION}")
     if "kaggle_rohlik_sales" in DATASET_SELECTION:
+        solution_id_outpath = os.path.join(os.getcwd(), 'data', 'solution_id.csv')
         # Load the DataFrame from the pickle file
         if not os.path.exists(PROCESSED_TEST_PATH):
             try:
+                calendar = pd.read_csv(CALENDAR_PATH)
+                inventory = pd.read_csv(INVENTORY_PATH)
+                sales_test = pd.read_csv(TEST_PATH)
+                print("Accessed .csv in data folder")
                 ######### derive solution_id column
-                solution_id_outpath = os.path.join(os.getcwd(), 'data', 'solution_id.csv')
                 if not os.path.exists(solution_id_outpath):
-                    solution_id = test_df['unique_id'].astype(str) + "_" + test_df['date']
+                    solution_id = sales_test['unique_id'].astype(str) + "_" + sales_test['date']
                     with open(solution_id_outpath, 'wb') as f:
                         pickle.dump(solution_id, f)
                     print(f"solution_id has been saved as pickle in {solution_id_outpath}")
@@ -350,10 +356,6 @@ def get_test_data():
 
                 #########
 
-                calendar = pd.read_csv(CALENDAR_PATH)
-                inventory = pd.read_csv(INVENTORY_PATH)
-                sales_test = pd.read_csv(TEST_PATH)
-                print("Accessed .csv in data folder")
                 try:
                     inventory['product_name'] = inventory['name'].str.split('_').str[0]
                     inventory['product_num'] = inventory['name'].str.split('_').str[1]
@@ -392,14 +394,15 @@ def get_test_data():
                 sales_test['year'] = sales_test['date'].dt.year
                 
                 #when used for test set# Load the saved label encoders
-                with open("label_encoders.pkl", "rb") as f:
+                with open( f"{LABEL_ENCODERS_PKL_OUTDIR}/lencoders.pkl", "rb") as f:
                     label_encoders = pickle.load(f)
                 for col, le in label_encoders.items():
                     sales_test[col] = le.transform(sales_test[col])
 
                 sales_test['product_num'] = pd.to_numeric(sales_test['product_num'], errors='coerce')
                 sales_test['cat_num'] = pd.to_numeric(sales_test['product_num'], errors='coerce')
-
+                sales_test.drop(columns=['date','unique_id'])
+                # sales_train.drop(columns=['sales', 'availability','date','unique_id'])
                 print("updated processed sales_test")
                 sales_test.to_pickle(PROCESSED_TEST_PATH)
                 print(f"DataFrame updated and saved as pickle file: {PROCESSED_TEST_PATH}")
@@ -413,6 +416,8 @@ def get_test_data():
         else:
             #load pickl
             sales_test = pd.read_pickle(PROCESSED_TEST_PATH)
+            with open(solution_id_outpath, "rb") as f:
+                solution_id = pickle.load(f)
         print("retreived sales_test")
         ###############
         X_df = sales_test.drop(columns=['date','unique_id'])

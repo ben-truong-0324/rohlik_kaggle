@@ -296,8 +296,13 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
             hidden_dim=params_dict['hidden_dim'],
             dropout_rate=params_dict['dropout_rate']
         ).to(device)
-    elif model_name == "MPL_lessrelu":
-        model = MLPRegression_lessRelu(input_dim, output_dim,).to(device)
+    elif model_name == "LSTM":
+        model = LSTMRegression(input_dim, output_dim, hidden_dim=params_dict['hidden_dim'], num_layers=1, dropout_rate=params_dict['dropout_rate']).to(device)
+    elif model_name == "SalienceNN":
+        model = LSTMRegression(input_dim, output_dim, hidden_dim=params_dict['hidden_dim'], num_layers=1, dropout_rate=params_dict['dropout_rate']).to(device)
+    elif model_name == "CNN":
+        model = CNNRegression(input_dim, output_dim, kernel_size=2, hidden_dim=params_dict['hidden_dim'], dropout_rate=params_dict['dropout_rate']).to(device)
+   
     else:
         raise ValueError(f"Unsupported model type: {model_name}")
     optimizer = optim.Adam(model.parameters(), lr=params_dict['lr'], weight_decay=params_dict['weight_decay'])
@@ -391,21 +396,21 @@ def save_model_log_results(best_cv_perfs, best_params,best_eval_func,best_models
 def reg_hyperparameter_tuning(X,y, device, model_name):
     # Define hyperparameter grid
     param_grid = {
-        'hidden_dim': [
+        'hidden_dim': [512,
             # 512, 1024, 2048,
                        10000,
                     #    20000
                        ],
-        'dropout_rate': [0.01,
+        'dropout_rate': [0.001,
                         #  .005, .05, 0.1, 
+                        0,
                          ],
-        # 'max_epochs': [1000, 2000, 5000],
-        # 'patience': [10, 20, 50],
-        'lr': [
+        'lr': [.02,
             # .01, .005, .0005, 
                .0001],
         'weight_decay': [0.0,
-                        #   0.01, 0.001
+                        #   0.01, 0.005
+                        .001,
                           ],
     }
     best_eval_func = -np.inf 
@@ -440,7 +445,7 @@ def reg_hyperparameter_tuning(X,y, device, model_name):
                         print(f"Starting fold {fold_idx + 1}")
                         X_train, X_val = X[train_idx], X[val_idx]
                         y_train, y_val = y[train_idx], y[val_idx]
-                        mse, mae, rmse, r2, runtime, model, epoch_losses = train_nn_early_stop_regressio(
+                        mse, mae, rmse, r2, runtime, model, epoch_losses = train_nn_early_stop_regression(
                                             X_train, y_train, X_val, y_val, 
                                             device, params_dict, criterion, model_name)
                         avg_metrics_per_cv["MSE"].append(mse)

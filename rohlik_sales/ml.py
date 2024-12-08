@@ -59,6 +59,7 @@ import pickle
 import numpy as np
 import pandas as pd
 from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor, HistGradientBoostingRegressor
 from sklearn.ensemble import BaggingRegressor, GradientBoostingRegressor
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
@@ -422,8 +423,11 @@ def train_and_evaluate_dt(X_train, y_train, X_test, y_test):
     dt = DecisionTreeRegressor(random_state=GT_ID)
     bagging = BaggingRegressor(estimator =dt, n_estimators=50, random_state=GT_ID)
     boosting = GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, random_state=GT_ID)
-    # Initialize XGBoost model (sklearn-compatible)
     xgboost_model = xgb.XGBRegressor(objective="reg:squarederror", random_state=GT_ID)
+    rf = RandomForestRegressor(n_estimators=100, random_state=GT_ID)
+    extra_trees = ExtraTreesRegressor(n_estimators=100, random_state=GT_ID)
+    hist_gb = HistGradientBoostingRegressor(max_iter=100, random_state=GT_ID)
+    
     
     param_grid = {  'max_depth': [3, 5, 10],
                     'min_samples_split': [2, 5],
@@ -436,6 +440,9 @@ def train_and_evaluate_dt(X_train, y_train, X_test, y_test):
         "Bagging with Decision Tree": bagging,
         "Boosting with Decision Tree": boosting,
         "XGBoost": xgboost_model,
+        "Random Forest": rf,
+        "Extra Trees": extra_trees,
+        "Histogram-based Gradient Boosting": hist_gb,
         "Tuned Decision Tree (GridSearch)": grid_search,
     }
     results = {}
@@ -548,7 +555,7 @@ def get_solutions(X_train):
             model_name = model_file.split('_')[0]
             if model_name not in inferred_models:
                 print(f"Loading individual model for {model_name}")
-                model = joblib.load(os.path.join(MODELS_OUTDIR, f"{model_name}_{timestamp}.joblib"))
+                model = joblib.load(os.path.join(MODELS_OUTDIR, model_file))
                 predictions = model.predict(X_test)
                 inferred_models.append(model_name)
                 inferred = True
@@ -563,12 +570,12 @@ def get_solutions(X_train):
 ###############
 def main(): 
     np.random.seed(GT_ID)
+    do_skl_train = 1
+    do_torch_train = 0
     start_time = time.time()
     X,y,X_train, X_test, y_train, y_test  = check_etl()
     check_data_info(X, y, X_train, X_test, y_train, y_test, show = False)
     print(f"Time to load data: {time.time() - start_time}s")
-    do_skl_train = 0
-    do_torch_train = 0
 
     ###### Sklearn models (just DT for now)
     if do_skl_train:
@@ -576,39 +583,18 @@ def main():
         if not os.path.exists(dt_result_save_file):
             results = train_and_evaluate_dt(X_train, y_train, X_test, y_test)
             save_results(results, f"{Y_PRED_OUTDIR}/dt_results.pkl")
-        # else:
-            # with open(dt_result_save_file, 'rb') as f:
-            #     results = pickle.load(f)
+        
     ####### Torch models (just MPL for now)
     if do_torch_train:
         mpl_result_save_file = f"{Y_PRED_OUTDIR}/mpl_results.pkl"
         if not os.path.exists(mpl_result_save_file):
             results = train_and_evaluate_mpl(X,y)
             save_results(results, f"{Y_PRED_OUTDIR}/mpl_results.pkl")
-        # else:
-        #     with open(mpl_result_save_file, 'rb') as f:
-        #         results = pickle.load(f)
+        
 
     ######## done training, now inference and derive solutions.csv
     get_solutions(X_train)
     
-
-
-
-
-    # res_vis_png_path = f"{AGGREGATED_OUTDIR}/results.png" 
-    # plots.plot_dt_results(results, res_vis_png_path)
-
-    # nn_performance_path = f'{PERFM_PKL_OUTDIR}/perf_results.pkl'
-    # cv_losses_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_losses.pkl'
-    # y_pred_outpath = f'{Y_PRED_OUTDIR}/y_pred_compare.pkl' 
-    # get_eval_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpath, do_cv = 0)
-
-    # nn_performance_reg_path = f'{PERFM_PKL_OUTDIR}/perf_reg_results.pkl'
-    # cv_losses_reg_outpath = f'{CV_LOSSES_PKL_OUTDIR}/cv_reg_losses.pkl'
-    # y_pred_reg_outpath = f'{Y_PRED_OUTDIR}/y_pred_reg_compare.pkl' 
-    # nn_results, cv_losses, y_preds = get_eval_reg_with_nn(X,y,nn_performance_reg_path,cv_losses_reg_outpath, y_pred_reg_outpath, do_cv = 0)
- 
 
 if __name__ == "__main__":
     ###################

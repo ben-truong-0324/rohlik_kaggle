@@ -61,68 +61,63 @@ class MLPRegression(nn.Module):
         x = torch.relu(self.fc3(x))
         x = self.dropout(x)
         return self.fc4(x)  # Output a continuous value
-    
-class MLPRegression_lessRelu(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim=852, dropout_rate=0.1):
-        super(MLPRegression_lessRelu, self).__init__()
-        self.dropout = nn.Dropout(dropout_rate)
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, hidden_dim // 2)
-        self.fc3 = nn.Linear(hidden_dim // 2, hidden_dim // 4)
-        self.fc4 = nn.Linear(hidden_dim // 4, output_dim)
-
-    def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
-        x = self.dropout(x)
-        x = self.fc3(x)
-        x = self.dropout(x)
-        return self.fc4(x)  # Output a continuous value
 
 class CNNRegression(nn.Module):
-    def __init__(self, input_channels, output_dim, conv_filters=64, kernel_size=3, dropout_rate=0.1):
+    def __init__(self, input_dim, output_dim, kernel_size, hidden_dim, dropout_rate):
         super(CNNRegression, self).__init__()
-        self.conv1 = nn.Conv1d(input_channels, conv_filters, kernel_size, padding=1)
-        self.conv2 = nn.Conv1d(conv_filters, conv_filters * 2, kernel_size, padding=1)
-        self.fc = nn.Linear(conv_filters * 2, output_dim)
+        self.conv1 = nn.Conv1d(input_dim, hidden_dim, kernel_size=kernel_size, padding=kernel_size//2)
+        self.pool = nn.MaxPool1d(kernel_size=2)
+        self.fc1 = nn.Linear(hidden_dim * (input_dim // 2), hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, output_dim)
+        self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout_rate)
-        self.pool = nn.AdaptiveAvgPool1d(1)
 
     def forward(self, x):
-        x = torch.relu(self.conv1(x))
+        x = self.relu(self.conv1(x))
+        x = self.pool(x)
+        x = x.view(x.size(0), -1)  # Flatten the tensor for fully connected layers
+        x = self.relu(self.fc1(x))
         x = self.dropout(x)
-        x = torch.relu(self.conv2(x))
-        x = self.pool(x).squeeze(-1)  # Pool to reduce spatial dimensions
-        return self.fc(x)
-    
+        x = self.fc2(x)
+        return x
 
 class LSTMRegression(nn.Module):
-    def __init__(self, input_dim, output_dim, lstm_hidden_dim=128, dropout_rate=0.1):
+    def __init__(self, input_dim, output_dim, hidden_dim, num_layers, dropout_rate):
         super(LSTMRegression, self).__init__()
-        self.lstm = nn.LSTM(input_dim, lstm_hidden_dim, batch_first=True)
-        self.fc = nn.Linear(lstm_hidden_dim, output_dim)
-        self.dropout = nn.Dropout(dropout_rate)
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout_rate)
+        self.fc = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
-        x = torch.relu(lstm_out[:, -1, :])  # Take the output from the last time step
-        x = self.dropout(x)
-        return self.fc(x)  # Output continuous value
+        output = self.fc(lstm_out[:, -1, :])  # Use the last output of the LSTM for regression
+        return output
+
+from sklearn.cluster import KMeans
+import numpy as np
+
+class SalienceNNRegression(nn.Module):
+    def __init__(self, input_dim, output_dim,hidden_dim, n_clusters=128):
+        super(SalienceNNRegression, self).__init__()
+        # K-Means clustering model to find clusters
+        self.kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        # MLP layer to process the clustered data
+        self.fc1 = nn.Linear(input_dim + n_clusters * input_dim, hidden_dim) 
+        self.fc2 = nn.Linear(hidden_dim, output_dim) 
+        self.relu = nn.ReLU()
+
+    def fit_kmeans(self, X_train):
+        self.kmeans.fit(X_train)
     
-
-class ConvLSTMRegression(nn.Module):
-    def __init__(self, input_dim, output_dim, conv_hidden_dim=64, lstm_hidden_dim=128, dropout_rate=0.1):
-        super(ConvLSTMRegression, self).__init__()
-        self.conv1 = nn.Conv1d(input_dim, conv_hidden_dim, kernel_size=3, padding=1)
-        self.lstm = nn.LSTM(conv_hidden_dim, lstm_hidden_dim, batch_first=True)
-        self.fc = nn.Linear(lstm_hidden_dim, output_dim)
-        self.dropout = nn.Dropout(dropout_rate)
-
-    def forward(self, x):
-        x = torch.relu(self.conv1(x.transpose(1, 2)))  # Conv1D expects (batch, channels, sequence)
-        x = x.transpose(1, 2)  # Switch back to (batch, sequence, channels)
-        lstm_out, _ = self.lstm(x)
-        x = torch.relu(lstm_out[:, -1, :])  # Take the output from the last time step
-        x = self.dropout(x)
-        return self.fc(x)  # Output continuous value
+    def forward(self, X, X_train):
+        # Step 1: Get the cluster assignments for the input instances
+        cluster_labels = self.kmeans.predict(X.cpu().numpy())  # Get cluster assignments
+        # Step 2: Get the cluster centroids (hidden states)
+        centroids = self.kmeans.cluster_centers_  # Shape: (n_clusters, input_dim)
+        # Step 3: For each instance, get the cluster centroid (or use other strategies like KNN to get neighbors)
+        cluster_context = centroids[cluster_labels]  # Shape: (batch_size, input_dim)
+        # Step 4: Concatenate the original features with the cluster context (hidden state)
+        combined_input = torch.cat((X, torch.tensor(cluster_context).float().to(X.device)), dim=1)
+        # Step 5: Feed through the MLP layers
+        x = self.relu(self.fc1(combined_input))
+        x = self.fc2(x)
+        return x

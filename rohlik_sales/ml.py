@@ -498,11 +498,11 @@ def train_and_evaluate_dt(X_train, y_train, X_test, y_test):
 def train_and_evaluate_mpl(X,y):
     # Initialize models
     results = {}
-    X = torch.FloatTensor(X.values).to(device)
-    y = torch.FloatTensor(y).to(device)
+    # X = torch.FloatTensor(X.values).to(device)
+    # y = torch.FloatTensor(y).to(device)
     for model_name in EVAL_REG_MODELS:
         model_start_time = time.time()
-        best_cv_perfs, best_params,best_eval_func = reg_hyperparameter_tuning(X,y, device, model_name,0)
+        best_cv_perfs, best_params,best_eval_func = reg_hyperparameter_tuning(X.values,y, device, model_name,0)
         results[model_name] = {
             "MSE": best_cv_perfs['MSE'],  
             "MAE": best_cv_perfs['MAE'],  

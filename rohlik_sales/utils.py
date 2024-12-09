@@ -290,8 +290,11 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
     max_epochs = 8
     patience = 2
     # Create DataLoaders for training and testing
-    train_dataset = TensorDataset(X_train, y_train)
-    test_dataset = TensorDataset(X_test, y_test)
+
+
+
+    train_dataset = TensorDataset(torch.FloatTensor(X_train), torch.FloatTensor(y_train))
+    test_dataset = TensorDataset(torch.FloatTensor(X_test), torch.FloatTensor(y_test))
 
     batch_size = params_dict.get('batch_size', 4000)  # Default batch size if not specified
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)

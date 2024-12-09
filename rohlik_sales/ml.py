@@ -502,7 +502,7 @@ def train_and_evaluate_mpl(X,y):
     y = torch.FloatTensor(y).to(device)
     for model_name in EVAL_REG_MODELS:
         model_start_time = time.time()
-        best_cv_perfs, best_params,best_eval_func = reg_hyperparameter_tuning(X,y, device, model_name,1)
+        best_cv_perfs, best_params,best_eval_func = reg_hyperparameter_tuning(X,y, device, model_name,0)
         results[model_name] = {
             "MSE": best_cv_perfs['MSE'],  
             "MAE": best_cv_perfs['MAE'],  

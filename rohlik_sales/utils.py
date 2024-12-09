@@ -287,13 +287,13 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
             output_dim = y_train.shape[1]  # Number of labels
         else:
             output_dim = len(np.unique(y_train.cpu()))
-    max_epochs = 25
-    patience = 5
+    max_epochs = 8
+    patience = 2
     # Create DataLoaders for training and testing
     train_dataset = TensorDataset(X_train, y_train)
     test_dataset = TensorDataset(X_test, y_test)
 
-    batch_size = params_dict.get('batch_size', 8192)  # Default batch size if not specified
+    batch_size = params_dict.get('batch_size', 4000)  # Default batch size if not specified
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
@@ -321,10 +321,13 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
 
     start_time = time.time()
     for epoch in range(max_epochs):
+        print(f"Start of epoch {epoch}")
+        print(f"Allocated: {torch.cuda.memory_allocated() / 1e9} GB")
+        print(f"Cached: {torch.cuda.memory_reserved() / 1e9} GB")
         epoch_start_time = time.time() 
         model.train()
         train_epoch_loss = 0.0
-
+        batch_start_time = time.time()  # Start timer for the batch
         for batch_idx, (batch_X, batch_y) in enumerate(train_loader):
             batch_X, batch_y = batch_X.to(device), batch_y.to(device)
             optimizer.zero_grad()
@@ -333,6 +336,9 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
             train_loss.backward()
             optimizer.step()
             train_epoch_loss += train_loss.item() * len(batch_X)  # Accumulate loss
+            if (batch_idx + 1) % 500 == 0 or (batch_idx + 1) == len(train_loader):
+                batch_runtime = time.time() - batch_start_time
+                print(f"Epoch {epoch + 1}/{max_epochs}, Batch {batch_idx + 1}/{len(train_loader)} - Loss: {train_loss.item():.4f}, Runtime: {batch_runtime:.2f} seconds")
             
            
         # Average train loss for the epoch
@@ -341,18 +347,27 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
         # Evaluate on test set
         model.eval()
         eval_epoch_loss = 0.0
+        batch_start_time = time.time()  # Start timer for the batch
         with torch.no_grad():
             for batch_idx, (batch_X, batch_y) in enumerate(test_loader):
                 batch_X, batch_y = batch_X.to(device), batch_y.to(device)
                 outputs_eval = model(batch_X).squeeze()
                 eval_loss = criterion(outputs_eval, batch_y)
                 eval_epoch_loss += eval_loss.item() * len(batch_X)
+                if (batch_idx + 1) % 500 == 0 or (batch_idx + 1) == len(train_loader):
+                    batch_runtime = time.time() - batch_start_time
+                    print(f"Epoch {epoch + 1}/{max_epochs}, Batch {batch_idx + 1}/{len(test_loader)} - Loss: {eval_loss.item():.4f}, Runtime: {batch_runtime:.2f} seconds")
+
                 
         # Average eval loss for the epoch
         eval_epoch_loss /= len(test_loader.dataset)
         epoch_losses.append((train_epoch_loss, eval_epoch_loss))
         epoch_runtime = time.time() - epoch_start_time
         print(f"Epoch {epoch + 1}/{max_epochs} - Train Loss: {train_epoch_loss:.4f}, Eval Loss: {eval_epoch_loss:.4f}, Runtime: {epoch_runtime:.2f} seconds")
+        print(f"Allocated: {torch.cuda.memory_allocated() / 1e9} GB")
+        print(f"Cached: {torch.cuda.memory_reserved() / 1e9} GB")
+        torch.cuda.empty_cache()  # Clear unused reserved memory
+        print("Called torch.cuda.empty_cache() ")
 
         # Early stopping logic
         if eval_epoch_loss < best_loss:
@@ -423,7 +438,7 @@ def save_model_log_results(best_cv_perfs, best_params,best_eval_func,best_models
 def reg_hyperparameter_tuning(X,y, device, model_name, do_cv=0):
     # Define hyperparameter grid
     param_grid = {
-        'hidden_dim': [64,
+        'hidden_dim': [100,
             # 512, 1024, 2048,
                     #    10000,
                     #    20000

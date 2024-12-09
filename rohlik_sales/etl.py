@@ -340,19 +340,20 @@ def get_test_data():
         # Load the DataFrame from the pickle file
         if not os.path.exists(PROCESSED_TEST_PATH):
             try:
-                calendar = pd.read_csv(CALENDAR_PATH)
-                inventory = pd.read_csv(INVENTORY_PATH)
-                sales_test = pd.read_csv(TEST_PATH)
-                print("Accessed .csv in data folder")
-                ######### derive solution_id column
                 if not os.path.exists(solution_id_outpath):
                     solution_id = sales_test['unique_id'].astype(str) + "_" + sales_test['date']
-                    with open(solution_id_outpath, 'wb') as f:
-                        pickle.dump(solution_id, f)
-                    print(f"solution_id has been saved as pickle in {solution_id_outpath}")
+                    
+                    # Create a DataFrame for solution_id
+                    solution_id_df = pd.DataFrame({'solution_id': solution_id})
+                    
+                    # Save solution_id as a CSV
+                    solution_id_df.to_csv(solution_id_outpath, index=False)
+                    print(f"solution_id has been saved as a CSV in {solution_id_outpath}")
                 else:
-                    with open(solution_id_outpath, "rb") as f:
-                        solution_id = pickle.load(f)
+                    # Read solution_id back from CSV
+                    solution_id_df = pd.read_csv(solution_id_outpath)
+                    solution_id = solution_id_df['solution_id']
+                    print(f"solution_id has been loaded from {solution_id_outpath}")
 
                 #########
 
@@ -415,17 +416,43 @@ def get_test_data():
         else:
             #load pickl
             sales_test = pd.read_pickle(PROCESSED_TEST_PATH)
-            with open(solution_id_outpath, "rb") as f:
-                solution_id = pickle.load(f)
+            solution_id_df = pd.read_csv(solution_id_outpath)
+            solution_id = solution_id_df['solution_id']
+
         print("retreived sales_test")
         ###############
-        X_df = sales_test.drop(columns=['date','unique_id'])
+        X_df = sales_test
         print(X_df.info())
     else: 
         print("#"*18)
         raise ValueError("Invalid dataset specified. Check config.py")
     if not isinstance(X_df, pd.DataFrame):
         X_df = pd.DataFrame(X_df)  # Convert to DataFrame
+
+    # Load solution_id and solution.csv
+    solution_csv = pd.read_csv('solution.csv')  # Replace with actual path to solution.csv
+    solution_csv_ids = solution_csv['id']
+
+    # Compare row counts
+    row_count_solution_id = len(solution_id)
+    row_count_solution_csv = len(solution_csv_ids)
+
+    if row_count_solution_id != row_count_solution_csv:
+        print(f"Row count mismatch: solution_id ({row_count_solution_id}) vs solution.csv ({row_count_solution_csv})")
+    else:
+        print(f"Row count matches: {row_count_solution_id} rows")
+
+    # Find mismatched rows
+    mismatched_rows = solution_id[~solution_id.isin(solution_csv_ids)]
+
+    # Output results
+    mismatch_count = len(mismatched_rows)
+    if mismatch_count > 0:
+        print(f"Found {mismatch_count} mismatched rows:")
+        print(mismatched_rows)
+    else:
+        print("No mismatched rows found")
+
     return X_df, solution_id
 
 

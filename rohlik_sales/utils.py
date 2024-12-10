@@ -287,8 +287,8 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
             output_dim = y_train.shape[1]  # Number of labels
         else:
             output_dim = len(np.unique(y_train.cpu()))
-    max_epochs = 8
-    patience = 2
+    max_epochs = 30
+    patience = 5
     # Create DataLoaders for training and testing
 
 
@@ -296,7 +296,7 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
     train_dataset = TensorDataset(torch.FloatTensor(X_train), torch.FloatTensor(y_train))
     test_dataset = TensorDataset(torch.FloatTensor(X_test), torch.FloatTensor(y_test))
 
-    batch_size = params_dict.get('batch_size', 4000)  # Default batch size if not specified
+    batch_size = params_dict.get('batch_size', 128)  # Default batch size if not specified
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
@@ -321,12 +321,10 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
     best_loss = float("inf")
     patience_counter = 0
     epoch_losses = []
-
+    
     start_time = time.time()
     for epoch in range(max_epochs):
         print(f"Start of epoch {epoch}")
-        print(f"Allocated: {torch.cuda.memory_allocated() / 1e9} GB")
-        print(f"Cached: {torch.cuda.memory_reserved() / 1e9} GB")
         epoch_start_time = time.time() 
         model.train()
         train_epoch_loss = 0.0
@@ -367,10 +365,7 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
         epoch_losses.append((train_epoch_loss, eval_epoch_loss))
         epoch_runtime = time.time() - epoch_start_time
         print(f"Epoch {epoch + 1}/{max_epochs} - Train Loss: {train_epoch_loss:.4f}, Eval Loss: {eval_epoch_loss:.4f}, Runtime: {epoch_runtime:.2f} seconds")
-        print(f"Allocated: {torch.cuda.memory_allocated() / 1e9} GB")
-        print(f"Cached: {torch.cuda.memory_reserved() / 1e9} GB")
-        torch.cuda.empty_cache()  # Clear unused reserved memory
-        print("Called torch.cuda.empty_cache() ")
+        
 
         # Early stopping logic
         if eval_epoch_loss < best_loss:
@@ -396,10 +391,14 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
     runtime = time.time() - start_time
 
     model.eval()
+    outputs_list = []
+    model.eval()
     with torch.no_grad():
-        outputs = model(X_test)
-        outputs = outputs.cpu().numpy()
-        y_test = y_test.cpu().numpy()
+        for batch_X, batch_y in test_loader:
+            batch_outputs = model(batch_X.to(device))
+            outputs_list.append(batch_outputs.cpu())  # Move outputs back to CPU to free GPU memory
+    outputs = torch.cat(outputs_list, dim=0).cpu().numpy()
+
 
     mse = mean_squared_error(y_test, outputs)
     mae = mean_absolute_error(y_test, outputs)

@@ -2,7 +2,7 @@
 import re
 import time
 import os
-from datetime import datetime
+import datetime
 import unittest
 import numpy as np
 import pandas as pd
@@ -415,7 +415,6 @@ def save_model_log_results(best_cv_perfs, best_params,best_eval_func,best_models
         f"Model: {model_name}\n"
         f"Saved Path: {model_name}_fold_x_yymmddhhmmss.joblib\n"  
         f"Timestamp: {timestamp}\n"
-        f"{EVAL_FUNC_METRIC.upper()}: {eval_metric_value:.4f}\n"
         f"Best Hyperparameters: {best_params}\n"
         f"Cross-validation Performance:\n"
         f"    MSE: {best_cv_perfs['MSE']:.4f}\n"
@@ -432,12 +431,14 @@ def save_model_log_results(best_cv_perfs, best_params,best_eval_func,best_models
 def reg_hyperparameter_tuning(X,y, device, model_name, do_cv=0):
     # Define hyperparameter grid
     param_grid = {
-        'hidden_dim': [512, 1024
+        'hidden_dim': [512, 
+                    #    1024,
             # 512, 1024, 2048,
                     #    10000,
                     #    20000
                        ],
-        'dropout_rate': [0.001,
+        'dropout_rate': [
+            # 0.001,
                         #  .005, .05, 0.1, 
                         0,
                          ],
@@ -447,7 +448,7 @@ def reg_hyperparameter_tuning(X,y, device, model_name, do_cv=0):
                .0001],
         'weight_decay': [0.0,
                         #   0.01, 0.005
-                        .001,
+                        # .001,
                           ],
     }
     best_eval_func = -np.inf 

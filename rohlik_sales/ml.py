@@ -422,11 +422,11 @@ def train_and_evaluate_dt(X_train, y_train, X_test, y_test):
     # Initialize models
     dt = DecisionTreeRegressor(random_state=GT_ID)
     bagging = BaggingRegressor(estimator =dt, n_estimators=50, random_state=GT_ID)
-    boosting = GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, random_state=GT_ID)
+    boosting = GradientBoostingRegressor(n_estimators=50, learning_rate=0.1, random_state=GT_ID)
     xgboost_model = xgb.XGBRegressor(objective="reg:squarederror", random_state=GT_ID)
-    rf = RandomForestRegressor(n_estimators=100, random_state=GT_ID)
-    extra_trees = ExtraTreesRegressor(n_estimators=100, random_state=GT_ID)
-    hist_gb = HistGradientBoostingRegressor(max_iter=100, random_state=GT_ID)
+    rf = RandomForestRegressor(n_estimators=50, random_state=GT_ID)
+    extra_trees = ExtraTreesRegressor(n_estimators=50, random_state=GT_ID)
+    hist_gb = HistGradientBoostingRegressor(max_iter=50, random_state=GT_ID)
     
     
     param_grid = {  'max_depth': [3, 5, 10],
@@ -443,7 +443,7 @@ def train_and_evaluate_dt(X_train, y_train, X_test, y_test):
         "Random Forest": rf,
         "Extra Trees": extra_trees,
         "Histogram-based Gradient Boosting": hist_gb,
-        "Tuned Decision Tree (GridSearch)": grid_search,
+        # "Tuned Decision Tree (GridSearch)": grid_search,
     }
     results = {}
     for model_name, model in models.items():
@@ -572,7 +572,7 @@ def main():
     np.random.seed(GT_ID)
   
     do_skl_train = 1
-    do_torch_train = 0
+    do_torch_train = 1
     start_time = time.time()
     X,y,X_train, X_test, y_train, y_test  = check_etl()
     check_data_info(X, y, X_train, X_test, y_train, y_test, show = False)

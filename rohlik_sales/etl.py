@@ -175,8 +175,8 @@ def get_data():
                 inventory = inventory[['unique_id', 'warehouse', 'product_name', 'product_num', 'cat_name', 'cat_num']]
                 sales_train = sales_train.merge(inventory, on=['unique_id', 'warehouse'], how='left')
                 print("processed and merged inventory data")
-                sales_train = sales_train.merge(calendar[['date', 'holiday', 'shops_closed', 'winter_school_holidays', 'school_holidays']],
-                                                on='date', how='left')
+                sales_train = sales_train.merge(calendar[['date', 'holiday', 'shops_closed', 'winter_school_holidays', 'school_holidays','warehouse']],
+                                                on=['date', 'warehouse'], how='left')
                 print("merged calendar data")
 
                 sales_train['date'] = pd.to_datetime(sales_train['date'])
@@ -337,18 +337,19 @@ def get_test_data():
     print(f"Getting test data for {DATASET_SELECTION}")
     if "kaggle_rohlik_sales" in DATASET_SELECTION:
         solution_id_outpath = os.path.join(os.getcwd(), 'data', 'solution_id.csv')
-        # Load the DataFrame from the pickle file
+
         if not os.path.exists(PROCESSED_TEST_PATH):
             try:
+                calendar = pd.read_csv(CALENDAR_PATH)
+                inventory = pd.read_csv(INVENTORY_PATH)
+                sales_test = pd.read_csv(TEST_PATH)
+                print(f"Initial number of rows in sales_test: {len(sales_test)}")
                 if not os.path.exists(solution_id_outpath):
-                    solution_id = sales_test['unique_id'].astype(str) + "_" + sales_test['date']
-                    
-                    # Create a DataFrame for solution_id
+                    sales_test['unique_id'] = sales_test['unique_id'].astype(str)
+                    sales_test['date'] = sales_test['date'].astype(str)
+                    solution_id = sales_test['unique_id'] + "_" + sales_test['date']
                     solution_id_df = pd.DataFrame({'solution_id': solution_id})
-                    
-                    # Save solution_id as a CSV
                     solution_id_df.to_csv(solution_id_outpath, index=False)
-                    print(f"solution_id has been saved as a CSV in {solution_id_outpath}")
                 else:
                     # Read solution_id back from CSV
                     solution_id_df = pd.read_csv(solution_id_outpath)
@@ -377,13 +378,14 @@ def get_test_data():
                     print("Displaying first few rows of inventory for debugging:")
                     print(inventory.head())
 
-
+                print(f" number of rows in sales_test: {len(sales_test)}")
                 inventory = inventory[['unique_id', 'warehouse', 'product_name', 'product_num', 'cat_name', 'cat_num']]
                 sales_test = sales_test.merge(inventory, on=['unique_id', 'warehouse'], how='left')
-                print("processed and merged inventory data")
-                sales_test = sales_test.merge(calendar[['date', 'holiday', 'shops_closed', 'winter_school_holidays', 'school_holidays']],
-                                                on='date', how='left')
+               
+                sales_test = sales_test.merge(calendar[['date', 'holiday', 'shops_closed', 'winter_school_holidays', 'school_holidays','warehouse']],
+                                                on=['date', 'warehouse'], how='left')
                 print("merged calendar data")
+                print(f"Initial number of rows in sales_test: {len(sales_test)}")
                 ############ nan qa
                 
                 nan_summary = sales_test.isnull().sum()
@@ -404,9 +406,10 @@ def get_test_data():
                 sales_test['cat_num'] = pd.to_numeric(sales_test['product_num'], errors='coerce')
                 sales_test.drop(columns=['date','unique_id'], inplace=True)
                 print("updated processed sales_test")
-                sales_test.to_pickle(PROCESSED_TEST_PATH)
+                # sales_test.to_pickle(PROCESSED_TEST_PATH)
+                print(f"Initial number of rows in sales_test: {len(sales_test)}")
                 print(f"DataFrame updated and saved as pickle file: {PROCESSED_TEST_PATH}")
-                
+                X_df = sales_test
             except FileNotFoundError:
                 print(f"Error: The file '{TEST_PATH}' was not found.")
                 return None
@@ -415,13 +418,12 @@ def get_test_data():
                 return None
         else:
             #load pickl
-            sales_test = pd.read_pickle(PROCESSED_TEST_PATH)
+            X_df = pd.read_pickle(PROCESSED_TEST_PATH)
             solution_id_df = pd.read_csv(solution_id_outpath)
             solution_id = solution_id_df['solution_id']
 
         print("retreived sales_test")
         ###############
-        X_df = sales_test
         print(X_df.info())
     else: 
         print("#"*18)
@@ -429,30 +431,7 @@ def get_test_data():
     if not isinstance(X_df, pd.DataFrame):
         X_df = pd.DataFrame(X_df)  # Convert to DataFrame
 
-    # Load solution_id and solution.csv
-    solution_csv = pd.read_csv('solution.csv')  # Replace with actual path to solution.csv
-    solution_csv_ids = solution_csv['id']
-
-    # Compare row counts
-    row_count_solution_id = len(solution_id)
-    row_count_solution_csv = len(solution_csv_ids)
-
-    if row_count_solution_id != row_count_solution_csv:
-        print(f"Row count mismatch: solution_id ({row_count_solution_id}) vs solution.csv ({row_count_solution_csv})")
-    else:
-        print(f"Row count matches: {row_count_solution_id} rows")
-
-    # Find mismatched rows
-    mismatched_rows = solution_id[~solution_id.isin(solution_csv_ids)]
-
-    # Output results
-    mismatch_count = len(mismatched_rows)
-    if mismatch_count > 0:
-        print(f"Found {mismatch_count} mismatched rows:")
-        print(mismatched_rows)
-    else:
-        print("No mismatched rows found")
-
+   
     return X_df, solution_id
 
 

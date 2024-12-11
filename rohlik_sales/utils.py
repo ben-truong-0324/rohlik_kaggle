@@ -287,7 +287,7 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
             output_dim = y_train.shape[1]  # Number of labels
         else:
             output_dim = len(np.unique(y_train.cpu()))
-    max_epochs = 30
+    max_epochs = 25
     patience = 5
     # Create DataLoaders for training and testing
 
@@ -328,7 +328,6 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
         epoch_start_time = time.time() 
         model.train()
         train_epoch_loss = 0.0
-        batch_start_time = time.time()  # Start timer for the batch
         for batch_idx, (batch_X, batch_y) in enumerate(train_loader):
             batch_X, batch_y = batch_X.to(device), batch_y.to(device)
             optimizer.zero_grad()
@@ -337,9 +336,6 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
             train_loss.backward()
             optimizer.step()
             train_epoch_loss += train_loss.item() * len(batch_X)  # Accumulate loss
-            if (batch_idx + 1) % 500 == 0 or (batch_idx + 1) == len(train_loader):
-                batch_runtime = time.time() - batch_start_time
-                print(f"Epoch {epoch + 1}/{max_epochs}, Batch {batch_idx + 1}/{len(train_loader)} - Loss: {train_loss.item():.4f}, Runtime: {batch_runtime:.2f} seconds")
             
            
         # Average train loss for the epoch
@@ -348,17 +344,13 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
         # Evaluate on test set
         model.eval()
         eval_epoch_loss = 0.0
-        batch_start_time = time.time()  # Start timer for the batch
         with torch.no_grad():
             for batch_idx, (batch_X, batch_y) in enumerate(test_loader):
                 batch_X, batch_y = batch_X.to(device), batch_y.to(device)
                 outputs_eval = model(batch_X).squeeze()
                 eval_loss = criterion(outputs_eval, batch_y)
                 eval_epoch_loss += eval_loss.item() * len(batch_X)
-                if (batch_idx + 1) % 500 == 0 or (batch_idx + 1) == len(train_loader):
-                    batch_runtime = time.time() - batch_start_time
-                    print(f"Epoch {epoch + 1}/{max_epochs}, Batch {batch_idx + 1}/{len(test_loader)} - Loss: {eval_loss.item():.4f}, Runtime: {batch_runtime:.2f} seconds")
-
+                
                 
         # Average eval loss for the epoch
         eval_epoch_loss /= len(test_loader.dataset)
@@ -440,7 +432,7 @@ def save_model_log_results(best_cv_perfs, best_params,best_eval_func,best_models
 def reg_hyperparameter_tuning(X,y, device, model_name, do_cv=0):
     # Define hyperparameter grid
     param_grid = {
-        'hidden_dim': [100,
+        'hidden_dim': [512, 1024
             # 512, 1024, 2048,
                     #    10000,
                     #    20000
@@ -449,7 +441,8 @@ def reg_hyperparameter_tuning(X,y, device, model_name, do_cv=0):
                         #  .005, .05, 0.1, 
                         0,
                          ],
-        'lr': [.02,
+        'lr': [
+            # .02,
             # .01, .005, .0005, 
                .0001],
         'weight_decay': [0.0,
@@ -468,7 +461,6 @@ def reg_hyperparameter_tuning(X,y, device, model_name, do_cv=0):
         for dropout_rate in param_grid['dropout_rate']:
             for weight_decay in param_grid['weight_decay']:
                 for lr in param_grid['lr']:
-                    # print(f"Training with hidden_dim={hidden_dim}, dropout_rate={dropout_rate}, max_epochs={max_epochs}, patience={patience}")
                     params_dict = {
                         'hidden_dim': hidden_dim,
                         'dropout_rate': dropout_rate,

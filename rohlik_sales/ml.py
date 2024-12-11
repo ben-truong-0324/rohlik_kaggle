@@ -570,8 +570,9 @@ def get_solutions(X_train):
 ###############
 def main(): 
     np.random.seed(GT_ID)
-    do_skl_train = 0
-    do_torch_train = 1
+  
+    do_skl_train = 1
+    do_torch_train = 0
     start_time = time.time()
     X,y,X_train, X_test, y_train, y_test  = check_etl()
     check_data_info(X, y, X_train, X_test, y_train, y_test, show = False)

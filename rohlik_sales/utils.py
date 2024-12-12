@@ -287,8 +287,8 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
             output_dim = y_train.shape[1]  # Number of labels
         else:
             output_dim = len(np.unique(y_train.cpu()))
-    max_epochs = 25
-    patience = 5
+    max_epochs = 2
+    patience = 2
     # Create DataLoaders for training and testing
 
 
@@ -296,7 +296,7 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
     train_dataset = TensorDataset(torch.FloatTensor(X_train), torch.FloatTensor(y_train))
     test_dataset = TensorDataset(torch.FloatTensor(X_test), torch.FloatTensor(y_test))
 
-    batch_size = params_dict.get('batch_size', 128)  # Default batch size if not specified
+    batch_size = params_dict.get('batch_size', 64)  # Default batch size if not specified
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
@@ -403,7 +403,7 @@ def save_model_log_results(best_cv_perfs, best_params,best_eval_func,best_models
     print(f"Best Hyperparameters: {best_params}")
     print(f"Best {EVAL_FUNC_METRIC.upper()} across all folds: {best_eval_func:.4f}")
     for idx, model in enumerate(best_models_ensemble):
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         model_path = os.path.join(
             MODELS_OUTDIR, 
             f"{model_name}_fold_{idx + 1}_{timestamp}.joblib"

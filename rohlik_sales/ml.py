@@ -227,7 +227,7 @@ def get_eval_reg_with_nn(X,y,nn_performance_path,cv_losses_outpath, y_pred_outpa
                 X_train, X_val = X[train_idx], X[val_idx]
                 y_train, y_val = y[train_idx], y[val_idx]
 
-                best_model, best_params,best_r2,log_rmse = reg_hyperparameter_tuning(X_train, y_train, X_val, y_val, device, model_name)
+                best_cv_perfs, best_params,best_eval_func, best_models_ensemble = reg_hyperparameter_tuning(X_train, y_train, X_val, y_val, device, model_name)
 
                 
                
@@ -421,12 +421,12 @@ def evaluate_metrics_in_context(y_true, y_pred, model_name, file_path=f"{TXT_OUT
 def train_and_evaluate_dt(X_train, y_train, X_test, y_test):
     # Initialize models
     dt = DecisionTreeRegressor(random_state=GT_ID)
-    bagging = BaggingRegressor(estimator =dt, n_estimators=50, random_state=GT_ID)
-    boosting = GradientBoostingRegressor(n_estimators=50, learning_rate=0.1, random_state=GT_ID)
+    bagging = BaggingRegressor(estimator =dt, n_estimators=24, random_state=GT_ID)
+    boosting = GradientBoostingRegressor(n_estimators=24, learning_rate=0.1, random_state=GT_ID)
     xgboost_model = xgb.XGBRegressor(objective="reg:squarederror", random_state=GT_ID)
-    rf = RandomForestRegressor(n_estimators=50, random_state=GT_ID)
-    extra_trees = ExtraTreesRegressor(n_estimators=50, random_state=GT_ID)
-    hist_gb = HistGradientBoostingRegressor(max_iter=50, random_state=GT_ID)
+    rf = RandomForestRegressor(n_estimators=24, random_state=GT_ID)
+    extra_trees = ExtraTreesRegressor(n_estimators=24, random_state=GT_ID)
+    hist_gb = HistGradientBoostingRegressor(max_iter=24, random_state=GT_ID)
     
     
     param_grid = {  'max_depth': [3, 5, 10],
@@ -502,7 +502,7 @@ def train_and_evaluate_mpl(X,y):
     y = torch.FloatTensor(y)
     for model_name in EVAL_REG_MODELS:
         model_start_time = time.time()
-        best_cv_perfs, best_params,best_eval_func = reg_hyperparameter_tuning(X,y, device, model_name,0)
+        best_cv_perfs, best_params,best_eval_func, best_models_ensemble = reg_hyperparameter_tuning(X,y, device, model_name,0)
         results[model_name] = {
             "MSE": best_cv_perfs['MSE'],  
             "MAE": best_cv_perfs['MAE'],  
@@ -571,7 +571,7 @@ def get_solutions(X_train):
 def main(): 
     np.random.seed(GT_ID)
   
-    do_skl_train = 1
+    do_skl_train = 0
     do_torch_train = 1
     start_time = time.time()
     X,y,X_train, X_test, y_train, y_test  = check_etl()

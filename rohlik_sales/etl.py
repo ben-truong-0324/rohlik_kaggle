@@ -406,7 +406,7 @@ def get_test_data():
                 sales_test['cat_num'] = pd.to_numeric(sales_test['product_num'], errors='coerce')
                 sales_test.drop(columns=['date','unique_id'], inplace=True)
                 print("updated processed sales_test")
-                # sales_test.to_pickle(PROCESSED_TEST_PATH)
+                sales_test.to_pickle(PROCESSED_TEST_PATH)
                 print(f"Initial number of rows in sales_test: {len(sales_test)}")
                 print(f"DataFrame updated and saved as pickle file: {PROCESSED_TEST_PATH}")
                 X_df = sales_test

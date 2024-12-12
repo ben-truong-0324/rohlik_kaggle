@@ -287,8 +287,8 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
             output_dim = y_train.shape[1]  # Number of labels
         else:
             output_dim = len(np.unique(y_train.cpu()))
-    max_epochs = 2
-    patience = 2
+    max_epochs = 15
+    patience = 5
     # Create DataLoaders for training and testing
 
 
@@ -431,10 +431,10 @@ def save_model_log_results(best_cv_perfs, best_params,best_eval_func,best_models
 def reg_hyperparameter_tuning(X,y, device, model_name, do_cv=0):
     # Define hyperparameter grid
     param_grid = {
-        'hidden_dim': [512, 
-                    #    1024,
+        'hidden_dim': [
+                    #    512, 1024,
             # 512, 1024, 2048,
-                    #    10000,
+                       10000,
                     #    20000
                        ],
         'dropout_rate': [

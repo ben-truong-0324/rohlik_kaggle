@@ -502,7 +502,7 @@ def train_and_evaluate_mpl(X,y):
     y = torch.FloatTensor(y)
     for model_name in EVAL_REG_MODELS:
         model_start_time = time.time()
-        best_cv_perfs, best_params,best_eval_func, best_models_ensemble = reg_hyperparameter_tuning(X,y, device, model_name,0)
+        best_cv_perfs, best_params,best_eval_func, best_models_ensemble = reg_hyperparameter_tuning(X,y, device, model_name,1)
         results[model_name] = {
             "MSE": best_cv_perfs['MSE'],  
             "MAE": best_cv_perfs['MAE'],  
@@ -532,39 +532,70 @@ def check_etl():
 
 def get_solutions(X_train):
     X_test, solution_id = etl.get_test_data()
-    print(X_train.info())
-    print(X_test.info())
     model_files = [f for f in os.listdir(MODELS_OUTDIR) if f.endswith('.joblib')]
     inferred_models = []
     for model_file in model_files:
+        print(model_file)
         inferred = False
         model_name = ''
         # Check if models with folds aka MPL 
         if "_fold_" in model_file:
             model_name = model_file.split('_fold_')[0]
-            if model_name not in inferred_models:
-                print(f"Loading ensemble models for {model_name}")
+            result_file =  os.path.join(SOLUTIONS_OUTDIR, f"solutions_{model_name}.csv") 
+            if not os.path.exists(result_file) and model_name not in inferred_models:
                 fold_models = [
                     joblib.load(os.path.join(MODELS_OUTDIR, model_file))
                     for model_file in model_files if model_file.startswith(f"{model_name}_fold_")
                 ]
-                predictions = np.mean([model.predict(X_test) for model in fold_models], axis=0)
+
+                for model in fold_models:
+                    model.eval()
+                
+                # Prepare data for PyTorch models
+                X_test_tensor = torch.FloatTensor(X_test.values)  # Convert X_test to a tensor
+                test_dataset = TensorDataset(X_test_tensor)  # Wrap it in a TensorDataset
+                test_loader = DataLoader(test_dataset, batch_size=1024, shuffle=False)  # Use a suitable batch size
+                
+                # Make predictions with each model
+                predictions_list = []
+
+                # Make predictions with each model
+                predictions_list = []
+                with torch.no_grad():  # Disable gradient computation for evaluation
+                    for model in fold_models:
+                        batch_predictions = []
+                        for batch in test_loader:
+                            batch_X = batch[0].to(device)  # Move batch data to GPU
+                            batch_pred = model(batch_X).cpu().numpy()  # Move predictions to CPU
+                            batch_predictions.append(batch_pred)
+                        predictions_list.append(np.concatenate(batch_predictions, axis=0))
+                
+                        # predictions = model(X_test_tensor).cpu().numpy()  # Move predictions to CPU
+                        # predictions_list.append(predictions)
+                
+                # Average predictions from all fold models
+                predictions = np.mean(predictions_list, axis=0)
                 inferred_models.append(model_name)
                 inferred = True
+            else:
+                print(f"Model {model_name} solutions already created at {result_file}")
         else: #no CV aka DT models
             model_name = model_file.split('_')[0]
-            if model_name not in inferred_models:
+            result_file =  os.path.join(SOLUTIONS_OUTDIR, f"solutions_{model_name}.csv") 
+            if not os.path.exists(result_file) and model_name not in inferred_models:
                 print(f"Loading individual model for {model_name}")
                 model = joblib.load(os.path.join(MODELS_OUTDIR, model_file))
                 predictions = model.predict(X_test)
                 inferred_models.append(model_name)
                 inferred = True
+            else:
+                print(f"Model {model_name} solutions already created at {result_file}")
         if inferred:
             results_df = pd.DataFrame({
                 'id': solution_id,
-                'sales_hat': predictions
+                'sales_hat': predictions.squeeze(),
             })
-            result_file =  os.path.join(SOLUTIONS_OUTDIR, f"solutions_{model_name}.csv") 
+            
             results_df.to_csv(result_file, index=False)
             print(f"Predictions for {model_name} saved in {result_file}")
 ###############

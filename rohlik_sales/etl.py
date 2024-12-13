@@ -417,6 +417,7 @@ def get_test_data():
             X_df = pd.read_pickle(PROCESSED_TEST_PATH)
             solution_id_df = pd.read_csv(solution_id_outpath)
             solution_id = solution_id_df['solution_id']
+            print(solution_id.info())
 
         print("retreived sales_test")
         ###############

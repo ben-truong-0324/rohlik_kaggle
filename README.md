@@ -16,6 +16,7 @@ To set up the project, it is recommended to use the provided `environment.yml` f
 ```bash
 conda env create -f environment.yml
 conda activate ml_general
+conda update --all & conda clean -p
 python -m rohlik_sales.ml
 
 # download/copy data into ./data/

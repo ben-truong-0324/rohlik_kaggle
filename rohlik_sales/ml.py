@@ -447,6 +447,7 @@ def train_and_evaluate_dt(X_train, y_train, X_test, y_test):
     }
     results = {}
     for model_name, model in models.items():
+        print(f"Starting for model {model_name}")
         start_time = time.time()
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
@@ -461,20 +462,17 @@ def train_and_evaluate_dt(X_train, y_train, X_test, y_test):
         r2 = r2_score(y_test, y_pred)
         rmse = np.sqrt(mean_squared_error(y_test, y_pred))
         model_params = model.get_params() if hasattr(model, 'get_params') else None
-
         results[model_name] = {
             "MSE": mse,
             "MAE": mae,
             "RMSE": rmse,
             "R2": r2,
             "runtime": time.time() - start_time,
-            'params': model_params,
-        }
+            'params': model_params,}
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         model_path = os.path.join(
             MODELS_OUTDIR,
-            f"{model_name}_{timestamp}.joblib"
-        )
+            f"{model_name}_{timestamp}.joblib")
         joblib.dump(model, model_path)
         print(f"Model {model_name} saved at {model_path}")
         log_entry = (
@@ -500,11 +498,10 @@ def train_and_evaluate_mpl(X,y):
     results = {}
     X = torch.FloatTensor(X.values)
     y = torch.FloatTensor(y)
-    print(EVAL_REG_MODELS)
     for model_name in EVAL_REG_MODELS:
         print(model_name)
         model_start_time = time.time()
-        best_cv_perfs, best_params,best_eval_func, best_models_ensemble = reg_hyperparameter_tuning(X,y, device, model_name,0)
+        best_cv_perfs, best_params,best_eval_func, best_models_ensemble = reg_hyperparameter_tuning(X,y, device, model_name,1)
         results[model_name] = {
             "MSE": best_cv_perfs['MSE'],  
             "MAE": best_cv_perfs['MAE'],  
@@ -532,7 +529,7 @@ def check_etl():
     print("======> Data verification complete")
     return X,y,X_train, X_test, y_train, y_test 
 
-def get_solutions(X_train):
+def get_solutions():
     X_test, solution_id = etl.get_test_data()
     model_files = [f for f in os.listdir(MODELS_OUTDIR) if f.endswith('.joblib')]
     inferred_models = []
@@ -593,6 +590,8 @@ def get_solutions(X_train):
             else:
                 print(f"Model {model_name} solutions already created at {result_file}")
         if inferred:
+            print(f"Length of solution_id: {len(solution_id)}")
+            print(f"Length of predictions: {len(predictions)}")
             results_df = pd.DataFrame({
                 'id': solution_id,
                 'sales_hat': predictions.squeeze(),
@@ -625,7 +624,7 @@ def main():
         
 
     ######## done training, now inference and derive solutions.csv
-    get_solutions(X_train)
+    get_solutions()
     
 
 if __name__ == "__main__":

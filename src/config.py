@@ -27,7 +27,7 @@ FARSIGHT_MODELS = [
                     ]
 
 EVAL_REG_MODELS = [
-    'MPL',
+    # 'MPL',
     # 'LSTM', 
     # 'CNN',
     'SalienceNN',

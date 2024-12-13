@@ -96,28 +96,29 @@ class LSTMRegression(nn.Module):
 
 
 class SalienceNNRegression(nn.Module):
-    def __init__(self, input_dim, output_dim,hidden_dim, n_clusters=128):
+    def __init__(self, input_dim, output_dim,hidden_dim, dropout_rate,n_clusters=128):
         super(SalienceNNRegression, self).__init__()
         # K-Means clustering model to find clusters
         self.kmeans = KMeans(n_clusters=n_clusters, random_state=42)
         # MLP layer to process the clustered data
-        self.fc1 = nn.Linear(input_dim + n_clusters * input_dim, hidden_dim) 
+        self.fc1 = nn.Linear(input_dim *2, hidden_dim) 
         self.fc2 = nn.Linear(hidden_dim, output_dim) 
         self.relu = nn.ReLU()
 
     def fit_kmeans(self, X_train):
         self.kmeans.fit(X_train)
     
-    def forward(self, X, X_train):
+
+    def forward(self, X):
+        if not hasattr(self.kmeans, "cluster_centers_"):
+            raise RuntimeError("KMeans model is not fitted. Please call `fit_kmeans` with training data before using the model.")
         # Step 1: Get the cluster assignments for the input instances
-        cluster_labels = self.kmeans.predict(X.cpu().numpy())  # Get cluster assignments
-        # Step 2: Get the cluster centroids (hidden states)
-        centroids = self.kmeans.cluster_centers_  # Shape: (n_clusters, input_dim)
-        # Step 3: For each instance, get the cluster centroid (or use other strategies like KNN to get neighbors)
+        X_np = X.cpu().numpy().astype(float)
+        cluster_labels = self.kmeans.predict(X_np)
+        # Step 2: Get the cluster centroids (hidden states) and ensure correct dtype
+        centroids = self.kmeans.cluster_centers_
         cluster_context = centroids[cluster_labels]  # Shape: (batch_size, input_dim)
-        # Step 4: Concatenate the original features with the cluster context (hidden state)
         combined_input = torch.cat((X, torch.tensor(cluster_context).float().to(X.device)), dim=1)
-        # Step 5: Feed through the MLP layers
         x = self.relu(self.fc1(combined_input))
         x = self.fc2(x)
         return x

@@ -287,7 +287,7 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
             output_dim = y_train.shape[1]  # Number of labels
         else:
             output_dim = len(np.unique(y_train.cpu()))
-    max_epochs = 15
+    max_epochs = 60
     patience = 5
     # Create DataLoaders for training and testing
 
@@ -311,6 +311,7 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
         model = LSTMRegression(input_dim, output_dim, hidden_dim=params_dict['hidden_dim'], num_layers=1, dropout_rate=params_dict['dropout_rate']).to(device)
     elif model_name == "SalienceNN":
         model = SalienceNNRegression(input_dim, output_dim,hidden_dim=params_dict['hidden_dim'],dropout_rate=params_dict['dropout_rate']).to(device)
+        model.fit_kmeans(X_train)
     elif model_name == "CNN":
         model = CNNRegression(input_dim, output_dim, kernel_size=2, hidden_dim=params_dict['hidden_dim'], dropout_rate=params_dict['dropout_rate']).to(device)
    
@@ -321,7 +322,7 @@ def train_nn_early_stop_regression(X_train, y_train, X_test, y_test, device,para
     best_loss = float("inf")
     patience_counter = 0
     epoch_losses = []
-    
+   
     start_time = time.time()
     for epoch in range(max_epochs):
         print(f"Start of epoch {epoch}")

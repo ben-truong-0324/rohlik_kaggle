@@ -500,9 +500,11 @@ def train_and_evaluate_mpl(X,y):
     results = {}
     X = torch.FloatTensor(X.values)
     y = torch.FloatTensor(y)
+    print(EVAL_REG_MODELS)
     for model_name in EVAL_REG_MODELS:
+        print(model_name)
         model_start_time = time.time()
-        best_cv_perfs, best_params,best_eval_func, best_models_ensemble = reg_hyperparameter_tuning(X,y, device, model_name,1)
+        best_cv_perfs, best_params,best_eval_func, best_models_ensemble = reg_hyperparameter_tuning(X,y, device, model_name,0)
         results[model_name] = {
             "MSE": best_cv_perfs['MSE'],  
             "MAE": best_cv_perfs['MAE'],  
@@ -611,17 +613,15 @@ def main():
 
     ###### Sklearn models (just DT for now)
     if do_skl_train:
-        dt_result_save_file = f"{Y_PRED_OUTDIR}/dt_results.pkl"
-        if not os.path.exists(dt_result_save_file):
-            results = train_and_evaluate_dt(X_train, y_train, X_test, y_test)
-            save_results(results, f"{Y_PRED_OUTDIR}/dt_results.pkl")
+        results = train_and_evaluate_dt(X_train, y_train, X_test, y_test)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_results(results, f"{Y_PRED_OUTDIR}/dt_results_{timestamp}.pkl")
         
     ####### Torch models (just MPL for now)
     if do_torch_train:
-        mpl_result_save_file = f"{Y_PRED_OUTDIR}/mpl_results.pkl"
-        if not os.path.exists(mpl_result_save_file):
-            results = train_and_evaluate_mpl(X,y)
-            save_results(results, f"{Y_PRED_OUTDIR}/mpl_results.pkl")
+        results = train_and_evaluate_mpl(X,y)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_results(results, f"{Y_PRED_OUTDIR}/mpl_results_{timestamp}.pkl")
         
 
     ######## done training, now inference and derive solutions.csv

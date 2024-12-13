@@ -222,15 +222,11 @@ def get_data():
         else:
             #load pickl
             sales_train = pd.read_pickle(PROCESSED_TRAIN_PATH)
-        print("retreived sales_train")
        
-        print(f"DataFrame updated and saved as pickle file: {PROCESSED_TRAIN_PATH}")
-
         ###############
         Y_df = sales_train['sales_whole']  # Target variable
         X_df = sales_train.drop(columns=[ 'sales_whole'])
-        print(X_df.info())
-        print(Y_df.info())
+       
     else: 
         print("#"*18)
         raise ValueError("Invalid dataset specified. Check config.py")
@@ -424,7 +420,6 @@ def get_test_data():
 
         print("retreived sales_test")
         ###############
-        print(X_df.info())
     else: 
         print("#"*18)
         raise ValueError("Invalid dataset specified. Check config.py")
